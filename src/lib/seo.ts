@@ -5,23 +5,33 @@ export const DEFAULT_DESCRIPTION = "Explore Tamark Solar Energy's solar solution
 export const SOCIAL_IMAGE = "/opengraph-image";
 
 export function getSiteOrigin() {
+  const isProduction = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+  const vercelUrl = process.env.VERCEL_URL?.trim();
+  const getVercelOrigin = () => {
+    if (!vercelUrl) throw new Error("VERCEL_URL is not configured.");
+    const parsed = new URL(`https://${vercelUrl}`);
+    if (!parsed.hostname || parsed.pathname !== "/" || parsed.search || parsed.hash) {
+      throw new Error("VERCEL_URL must be a deployment hostname.");
+    }
+    return parsed.origin;
+  };
   const configuredUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
   if (configuredUrl) {
     try {
       const parsed = new URL(configuredUrl);
       if (!["http:", "https:"].includes(parsed.protocol) || !parsed.hostname) throw new Error();
-      if ((process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production") &&
+      if (isProduction &&
           ["localhost", "127.0.0.1", "::1"].includes(parsed.hostname)) {
         throw new Error();
       }
       return parsed.origin;
     } catch {
+      if (isProduction && vercelUrl) return getVercelOrigin();
       throw new Error("NEXT_PUBLIC_SITE_URL must be a valid public HTTP(S) origin.");
     }
   }
-  const vercelUrl = process.env.VERCEL_URL?.trim();
-  if (vercelUrl) return new URL(`https://${vercelUrl}`).origin;
-  if (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production") {
+  if (vercelUrl) return getVercelOrigin();
+  if (isProduction) {
     throw new Error("Set NEXT_PUBLIC_SITE_URL or VERCEL_URL to a public origin before building or serving the production app.");
   }
   return "http://localhost:3000";
