@@ -1,0 +1,29 @@
+{
+  "name": "Tamark Solar Energy",
+  "short_name": "Tamark",
+  "description": "Solar energy solutions and practical technical training.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#102A2A",
+  "icons": [
+    {
+      "src": "/icons/solar-leaf-energy-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/solar-leaf-energy-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/solar-leaf-energy-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
