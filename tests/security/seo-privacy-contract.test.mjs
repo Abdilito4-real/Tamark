@@ -28,7 +28,7 @@ test("public page metadata uses canonical URLs, descriptive social metadata, and
   assert.match(training, /programme\.is_published && programme\.price_approved/);
 });
 
-test("production SEO requires the configured canonical origin instead of localhost", () => {
+test("production SEO uses a configured origin or Vercel URL and never falls back to localhost", () => {
   const { outputText } = ts.transpileModule(seo, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   });
@@ -37,12 +37,14 @@ test("production SEO requires the configured canonical origin instead of localho
     runInNewContext(outputText, { module, exports: module.exports, process: { env }, URL });
     return module.exports;
   };
-  assert.throws(() => loadSeo({ NODE_ENV: "production" }).getSiteOrigin(), /NEXT_PUBLIC_SITE_URL/);
+  assert.throws(() => loadSeo({ NODE_ENV: "production" }).getSiteOrigin(), /NEXT_PUBLIC_SITE_URL or VERCEL_URL/);
   assert.throws(
     () => loadSeo({ NODE_ENV: "production", NEXT_PUBLIC_SITE_URL: "http://localhost:3000" }).getSiteOrigin(),
     /public HTTP\(S\) origin/,
   );
   assert.equal(loadSeo({ NODE_ENV: "production", NEXT_PUBLIC_SITE_URL: "https://tamark.example/path" }).getSiteOrigin(), "https://tamark.example");
+  assert.equal(loadSeo({ NODE_ENV: "production", VERCEL_URL: "tamark-git-main.vercel.app", VERCEL_ENV: "production" }).getSiteOrigin(), "https://tamark-git-main.vercel.app");
+  assert.equal(loadSeo({ NODE_ENV: "production", VERCEL_URL: "tamark-preview.vercel.app", VERCEL_ENV: "preview" }).getSiteOrigin(), "https://tamark-preview.vercel.app");
   assert.equal(loadSeo({ NODE_ENV: "development" }).getSiteOrigin(), "http://localhost:3000");
 });
 

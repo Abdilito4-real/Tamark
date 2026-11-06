@@ -20,9 +20,9 @@ export function getSiteOrigin() {
     }
   }
   const vercelUrl = process.env.VERCEL_URL?.trim();
-  if (vercelUrl && process.env.VERCEL_ENV !== "production") return new URL(`https://${vercelUrl}`).origin;
+  if (vercelUrl) return new URL(`https://${vercelUrl}`).origin;
   if (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production") {
-    throw new Error("Set NEXT_PUBLIC_SITE_URL to the canonical production origin before building or serving the production app.");
+    throw new Error("Set NEXT_PUBLIC_SITE_URL or VERCEL_URL to a public origin before building or serving the production app.");
   }
   return "http://localhost:3000";
 }

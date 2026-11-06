@@ -20,7 +20,7 @@ Next.js App Router application based on the approved prototype design. The origi
 14. If any migration reports an error, stop. Do not run later migrations or reset/drop database objects. Inspect the migration state using the recovery procedure in `SECURITY-ARCHITECTURE.md`; resume only after the failed stage has been diagnosed.
 15. Configure Web Push VAPID values as described below, then start the development server with `npm run dev`.
 
-Use `http://localhost:3000` with `npm run dev`. Production builds require `NEXT_PUBLIC_SITE_URL` to be set to a non-local HTTP(S) origin; production deployments must use Tamark's actual canonical HTTPS origin, not a Vercel deployment-specific URL. For build-only local validation before the domain is confirmed, a reserved `.example` origin may be used, but must never be deployed.
+Use `http://localhost:3000` with `npm run dev`. Vercel builds use the deployment-provided `VERCEL_URL` when `NEXT_PUBLIC_SITE_URL` is unset, so production builds can complete without a custom domain. Configure `NEXT_PUBLIC_SITE_URL` in Vercel's project environment settings to Tamark's actual canonical HTTPS domain for correct canonical links, Open Graph URLs, and sitemap entries. Do not use a preview deployment URL as the production canonical.
 
 The service-role key and Paystack secret key are server-only. Never prefix either with `NEXT_PUBLIC_` or expose them to the browser. `PAYSTACK_MODE` defaults to `test`; use a Paystack test secret key (`sk_test_...`) for development. The application rejects a live key in test mode. Only set `PAYSTACK_MODE=live` together with a live secret key (`sk_live_...`) when Tamark has approved production payments.
 
