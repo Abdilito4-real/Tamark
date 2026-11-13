@@ -295,17 +295,22 @@ tr:last-child td { border-bottom: 0; }
 .student-empty-note { display: grid; flex: 1; align-content: center; justify-items: center; gap: 8px; min-height: 105px; color: var(--mu); }
 .student-empty-note p { margin: 0; font-size: 11px; }
 .student-panel-link { justify-content: space-between; margin-top: 12px; padding-top: 13px; border-top: 1px solid #edf1ee; }
-.programme-admin-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; }
-.programme-admin-card { overflow: hidden; border: 1px solid var(--bd); border-radius: 16px; background: white; box-shadow: 0 7px 22px rgba(16, 42, 42, .04); }
-.programme-admin-image { display: grid; min-height: 145px; place-items: center; background: linear-gradient(140deg, var(--lt), #cfeedd); background-position: center; background-size: cover; color: #648075; }
-.programme-admin-body { padding: 17px; }
-.programme-admin-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
-.programme-admin-heading h2 { margin: 9px 0 0; font-size: 15px; }
-.programme-admin-body > p { min-height: 34px; margin: 9px 0 13px; font-size: 11px; }
-.programme-admin-meta, .programme-admin-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 10px; }
-.programme-admin-meta { padding-bottom: 13px; border-bottom: 1px solid #edf1ee; color: var(--mu); }
-.programme-admin-meta strong { color: var(--tx); font-size: 12px; }
-.programme-admin-footer { padding-top: 13px; color: var(--mu); }
+.programme-admin-table-wrap { margin-top: 20px; }
+.programme-admin-table { min-width: 1000px; }
+.programme-admin-table th, .programme-admin-table td { vertical-align: middle; }
+.programme-admin-table td { padding-block: 11px; }
+.programme-admin-thumb { display: grid; width: 82px; height: 60px; place-items: center; border-radius: 8px; background: linear-gradient(140deg, var(--lt), #cfeedd); background-position: center; background-size: cover; color: #648075; }
+.programme-admin-details { min-width: 280px; max-width: 440px; white-space: normal; }
+.programme-admin-details > * { display: block; overflow-wrap: anywhere; }
+.programme-admin-details strong { margin-bottom: 4px; color: var(--navy); font-size: 13px; }
+.programme-admin-category { color: var(--em); font-size: 10px; font-weight: 750; text-transform: uppercase; }
+.programme-admin-slug { margin-top: 2px; color: var(--mu); font-size: 10px; }
+.programme-admin-details p { margin: 6px 0 0; color: var(--mu); font-size: 11px; line-height: 1.5; }
+.programme-catalogue-status.hidden { background: #f4eee8; color: #82542f; }
+.programme-admin-actions { flex-wrap: nowrap; }
+.programme-admin-actions .button { min-height: 38px; }
+.programme-admin-edit-row > td { padding: 18px; background: #f8faf9; white-space: normal; }
+.programme-admin-edit-row .manager-form { width: 100%; max-width: none; margin: 0; }
 .programme-image-upload { display: grid; grid-template-columns: 140px minmax(0, 1fr); align-items: center; gap: 16px; }
 .programme-image-preview { display: grid; min-height: 95px; place-items: center; border: 1px dashed #cbd9d0; border-radius: 12px; background: linear-gradient(140deg, var(--lt), #cfeedd); background-position: center; background-size: cover; color: #648075; }
 .programme-image-upload .field { margin: 0; }
@@ -483,7 +488,6 @@ tr:last-child td { border-bottom: 0; }
   .dashboard-content h1 { font-size: 25px; }
   .student-dashboard-heading { align-items: start; flex-direction: column; }
   .student-dashboard-heading .button { width: 100%; }
-  .programme-admin-grid { grid-template-columns: 1fr; }
   .student-stat-grid { grid-template-columns: 1fr; }
   .application-admin-grid, .student-admin-grid, .announcement-admin-grid, .summary-app-grid, .student-record-grid { grid-template-columns: 1fr; }
   .schedule-admin-card, .student-schedule-card { grid-template-columns: 56px minmax(0, 1fr); gap: 11px; padding: 13px; }

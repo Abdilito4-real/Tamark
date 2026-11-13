@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, Fragment, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Bell, BookOpen, CalendarDays, Check, Clock3, Download, FileText, ImagePlus, KeyRound, Mail, MapPin, Pencil, Phone, Plus, RefreshCw, ShieldCheck, Trash2, UserRound, Award } from "lucide-react";
 import { EmptyState, Notice } from "@/components/ui";
@@ -119,20 +119,39 @@ function ProgrammeManager({ programmes, editing, setEditing, saving, onSave, onU
   programmes: Programme[]; editing: JsonRecord | null; setEditing: (value: JsonRecord | null) => void; saving: boolean; onSave: (body: JsonRecord, id?: string) => Promise<void>; onUnpublish: (id: string) => void;
 }) {
   return <>
-    <div className="manager-heading"><p>Publish a programme when its training information is ready for applications.</p><button className="button button-primary" onClick={() => setEditing({})}><Plus size={16} /> Add programme</button></div>
-    {editing !== null && <ProgrammeForm value={editing} saving={saving} onCancel={() => setEditing(null)} onSave={(body) => onSave(body, typeof editing.id === "string" ? editing.id : undefined)} />}
-    {programmes.length ? <div className="programme-admin-grid">{programmes.map((p) => {
+    <div className="manager-heading"><p>Publish a programme when its training information is ready for applications.</p><button className="button button-primary" type="button" onClick={() => setEditing({})}><Plus size={16} /> Add programme</button></div>
+    {editing !== null && typeof editing.id !== "string" && <ProgrammeForm value={editing} saving={saving} onCancel={() => setEditing(null)} onSave={(body) => onSave(body)} />}
+    {programmes.length ? <div className="data-table-wrap programme-admin-table-wrap">
+      <table className="programme-admin-table">
+        <caption className="sr-only">Training programmes and management actions</caption>
+        <thead><tr><th scope="col">Image</th><th scope="col">Programme details</th><th scope="col">Duration</th><th scope="col">Publication</th><th scope="col">Catalogue</th><th scope="col">Actions</th></tr></thead>
+        <tbody>{programmes.map((p) => {
       const imageUrl = getProgrammeImageUrl(p.image_path);
-      return <article className="programme-admin-card" key={p.id}>
-        <div className="programme-admin-image" role={imageUrl ? "img" : undefined} aria-label={imageUrl ? p.name : undefined} style={imageUrl ? { backgroundImage: `url("${imageUrl}")` } : undefined}>{!imageUrl && <ImagePlus size={24} aria-hidden="true" />}</div>
-        <div className="programme-admin-body">
-          <div className="programme-admin-heading"><div><span className="tag">{p.category}</span><h2>{p.name}</h2></div><span className={`status-tag ${p.is_published ? "status-published" : "status-draft"}`}>{p.is_published ? "Published" : "Draft"}</span></div>
-          <p className="muted">{p.summary || "Programme description not added yet."}</p>
-          <div className="programme-admin-meta"><span>{p.duration || "Duration not set"}</span></div>
-          <div className="programme-admin-footer"><span>{p.is_listed ? "Visible in catalogue" : "Hidden from catalogue"}</span><div className="table-actions"><button className="button button-outline button-small" onClick={() => setEditing({ ...p, curriculum: p.curriculum.join("\n"), outcomes: p.outcomes.join("\n") })}><Pencil size={14} /> Edit</button>{p.is_published && <button className="button button-outline button-small" onClick={() => onUnpublish(p.id)}>Unpublish</button>}</div></div>
-        </div>
-      </article>;
-    })}</div> : <EmptyState title="No programme records">Use “Add programme” to create a draft course record.</EmptyState>}
+      const isEditing = editing?.id === p.id;
+      return <Fragment key={p.id}>
+        <tr>
+          <td><span className="programme-admin-thumb" role={imageUrl ? "img" : undefined} aria-label={imageUrl ? `${p.name} image` : undefined} style={imageUrl ? { backgroundImage: `url("${imageUrl}")` } : undefined}>{!imageUrl && <ImagePlus size={22} aria-hidden="true" />}</span></td>
+          <td className="programme-admin-details">
+            <strong>{p.name}</strong>
+            <span className="programme-admin-category">{p.category || "Uncategorized"}</span>
+            <span className="programme-admin-slug">/{p.slug}</span>
+            <p>{p.summary || "Programme description not added yet."}</p>
+          </td>
+          <td>{p.duration || "Not set"}</td>
+          <td><span className={`status-tag ${p.is_published ? "status-published" : "status-draft"}`}>{p.is_published ? "Published" : "Draft"}</span></td>
+          <td><span className={`status-tag programme-catalogue-status ${p.is_listed ? "listed" : "hidden"}`}>{p.is_listed ? "Listed" : "Hidden"}</span></td>
+          <td><div className="table-actions programme-admin-actions">
+            <button className="button button-outline button-small" type="button" disabled={saving} aria-expanded={isEditing} aria-controls={`programme-edit-${p.id}`} onClick={() => setEditing(isEditing ? null : { ...p, curriculum: p.curriculum.join("\n"), outcomes: p.outcomes.join("\n") })}><Pencil size={14} /> {isEditing ? "Cancel" : "Edit"}</button>
+            {p.is_published && <button className="button button-outline button-small" type="button" disabled={saving} onClick={() => onUnpublish(p.id)}>Unpublish</button>}
+          </div></td>
+        </tr>
+        <tr id={`programme-edit-${p.id}`} className="programme-admin-edit-row" hidden={!isEditing}>
+          <td colSpan={6}>{isEditing && editing && <ProgrammeForm value={editing} saving={saving} onCancel={() => setEditing(null)} onSave={(body) => onSave(body, p.id)} />}</td>
+        </tr>
+      </Fragment>;
+    })}</tbody>
+      </table>
+    </div> : <EmptyState title="No programme records">Use “Add programme” to create a draft course record.</EmptyState>}
   </>;
 }
 

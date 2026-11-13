@@ -61,6 +61,23 @@ test("admin gallery CRUD uses a detailed responsive table with expandable inline
   assert.match(styles, /\.data-table-wrap\s*\{\s*overflow-x:\s*auto/);
 });
 
+test("admin training programme CRUD uses a detailed responsive table", () => {
+  const programmeManager = dashboardManager.slice(dashboardManager.indexOf("function ProgrammeManager"), dashboardManager.indexOf("function ProgrammeForm"));
+  assert.match(programmeManager, /<button className="button button-primary" type="button" onClick=\{\(\) => setEditing\(\{\}\)\}><Plus/);
+  assert.match(programmeManager, /<th scope="col">Programme details<\/th>/);
+  assert.match(programmeManager, /<th scope="col">Duration<\/th>/);
+  assert.match(programmeManager, /<th scope="col">Publication<\/th>/);
+  assert.match(programmeManager, /<th scope="col">Catalogue<\/th>/);
+  assert.match(programmeManager, /<th scope="col">Actions<\/th>/);
+  assert.match(programmeManager, /programme-admin-slug/);
+  assert.match(programmeManager, /aria-expanded=\{isEditing\}/);
+  assert.match(programmeManager, /<ProgrammeForm value=\{editing\} saving=\{saving\} onCancel/);
+  assert.match(programmeManager, /onSave=\{\(body\) => onSave\(body, p\.id\)\}/);
+  assert.match(programmeManager, /onUnpublish\(p\.id\)/);
+  assert.match(styles, /\.programme-admin-table\s*\{\s*min-width:\s*1000px/);
+  assert.match(styles, /\.programme-admin-table-wrap\s*\{\s*margin-top:\s*20px/);
+});
+
 test("WhatsApp settings prefill Nigeria's country code when no destination is saved", () => {
   const settings = dashboardManager.slice(dashboardManager.indexOf("function SettingsManager"), dashboardManager.indexOf("function AdminSummary"));
   assert.match(settings, /value\?\.whatsapp_phone \|\| "\+234"/);
