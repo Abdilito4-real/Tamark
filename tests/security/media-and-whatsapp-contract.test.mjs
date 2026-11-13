@@ -40,13 +40,25 @@ test("gallery upload shows the selected image in a preview box without metadata 
   assert.doesNotMatch(uploader, /Image title and alt text|Display order|Publish on public homepage/);
 });
 
-test("admin gallery items render as a single-column accessible list on desktop and mobile", () => {
-  assert.match(dashboardManager, /gallery-admin-list" role="list"/);
-  assert.match(dashboardManager, /gallery-admin-card" role="listitem"/);
-  assert.match(styles, /\.gallery-admin-list\s*\{\s*display:\s*grid;\s*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
-  assert.match(styles, /\.gallery-admin-card\s*\{[^}]*grid-template-areas:\s*"image title"/);
-  const mobileStyles = styles.slice(styles.indexOf("@media (max-width: 600px)"));
-  assert.match(mobileStyles, /\.gallery-admin-card\s*\{\s*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+test("admin gallery CRUD uses a detailed responsive table with expandable inline editing", () => {
+  const galleryManager = dashboardManager.slice(dashboardManager.indexOf("function GalleryManager"), dashboardManager.indexOf("function GalleryItemEditor"));
+  const galleryEditor = dashboardManager.slice(dashboardManager.indexOf("function GalleryItemEditor"), dashboardManager.indexOf("function CertificatesManager"));
+  assert.match(galleryManager, /gallery-admin-table-wrap/);
+  assert.match(galleryManager, /<th scope="col">Photo details<\/th>/);
+  assert.match(galleryManager, /<th scope="col">Order<\/th>/);
+  assert.match(galleryManager, /<th scope="col">Status<\/th>/);
+  assert.match(galleryManager, /<th scope="col">Added<\/th>/);
+  assert.match(galleryManager, /<th scope="col">Actions<\/th>/);
+  assert.match(galleryEditor, /aria-expanded=\{editing\}/);
+  assert.match(galleryEditor, /aria-controls=\{editId\}/);
+  assert.match(galleryEditor, /<strong>\{title \|\| "Untitled photo"\}<\/strong>/);
+  assert.match(galleryEditor, /Published on public homepage/);
+  assert.match(galleryEditor, /Save changes/);
+  assert.match(galleryEditor, /onClick=\{cancelEdit\}/);
+  assert.match(galleryEditor, /void remove\(\)/);
+  assert.match(styles, /\.gallery-admin-table-wrap\s*\{\s*margin-top:\s*20px/);
+  assert.match(styles, /\.gallery-admin-table\s*\{\s*min-width:\s*820px/);
+  assert.match(styles, /\.data-table-wrap\s*\{\s*overflow-x:\s*auto/);
 });
 
 test("WhatsApp settings prefill Nigeria's country code when no destination is saved", () => {

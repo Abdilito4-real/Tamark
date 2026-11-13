@@ -409,7 +409,13 @@ function GalleryManager({ records, onRefresh }: { records: JsonRecord[]; onRefre
       {image && <p className="gallery-upload-filename">{image.name}</p>}
       <button className="button button-primary" disabled={busy || !image}>{busy ? "Uploading…" : "Upload image"}</button>
     </form>
-    {records.length ? <div className="gallery-admin-list" role="list">{records.map((item) => <GalleryItemEditor key={String(item.id)} item={item} onRefresh={onRefresh} />)}</div> : <EmptyState title="No gallery photos">Upload an approved photo to publish it on the website.</EmptyState>}
+    {records.length ? <div className="data-table-wrap gallery-admin-table-wrap">
+      <table className="gallery-admin-table">
+        <caption className="sr-only">Gallery photos and management actions</caption>
+        <thead><tr><th scope="col">Image</th><th scope="col">Photo details</th><th scope="col">Order</th><th scope="col">Status</th><th scope="col">Added</th><th scope="col">Actions</th></tr></thead>
+        <tbody>{records.map((item) => <GalleryItemEditor key={String(item.id)} item={item} onRefresh={onRefresh} />)}</tbody>
+      </table>
+    </div> : <EmptyState title="No gallery photos">Upload an approved photo to publish it on the website.</EmptyState>}
   </>;
 }
 
@@ -420,6 +426,17 @@ function GalleryItemEditor({ item, onRefresh }: { item: JsonRecord; onRefresh: (
   const [sortOrder, setSortOrder] = useState(String(item.sort_order ?? 0));
   const [published, setPublished] = useState(item.is_published === true);
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const itemId = String(item.id);
+  const editId = `gallery-edit-${itemId}`;
+
+  function cancelEdit() {
+    setTitle(String(item.title ?? ""));
+    setDescription(String(item.description ?? ""));
+    setSortOrder(String(item.sort_order ?? 0));
+    setPublished(item.is_published === true);
+    setEditing(false);
+  }
 
   async function update(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -429,6 +446,7 @@ function GalleryItemEditor({ item, onRefresh }: { item: JsonRecord; onRefresh: (
         method: "PATCH",
         body: JSON.stringify({ title, description, sort_order: Number(sortOrder), is_published: published }),
       });
+      setEditing(false);
       onRefresh();
       toast({ kind: "success", title: "Photo updated" });
     } catch (reason) {
@@ -448,17 +466,37 @@ function GalleryItemEditor({ item, onRefresh }: { item: JsonRecord; onRefresh: (
     } catch (reason) {
       toast({ kind: "error", title: "Could not delete photo", description: reason instanceof Error ? reason.message : "Please try again." });
       onRefresh();
+    } finally {
       setBusy(false);
     }
   }
-  return <form className="form-card manager-form gallery-admin-card" role="listitem" onSubmit={(event) => void update(event)}>
-    {typeof item.image_url === "string" && <div className="gallery-admin-image" role="img" aria-label={title} style={{ backgroundImage: `url("${item.image_url}")` }} />}
-    <Field label="Image title and alt text" value={title} onChange={setTitle} required />
-    <Field label="Caption" value={description} onChange={setDescription} area />
-    <Field label="Display order" value={sortOrder} onChange={setSortOrder} type="number" min="0" />
-    <label className="check-field"><input type="checkbox" checked={published} onChange={(event) => setPublished(event.target.checked)} /> Published</label>
-    <div className="wizard-actions"><button className="button button-primary button-small" disabled={busy}>{busy ? "Saving…" : "Save photo"}</button><button className="button button-outline button-small danger-button" type="button" disabled={busy} onClick={() => void remove()}><Trash2 size={14} /> Delete</button></div>
-  </form>;
+  return <>
+    <tr>
+      <td>{typeof item.image_url === "string" && <span className="gallery-admin-thumb" role="img" aria-label={title} style={{ backgroundImage: `url("${item.image_url}")` }} />}</td>
+      <td className="gallery-admin-details"><strong>{title || "Untitled photo"}</strong><span>{description || "No caption"}</span></td>
+      <td>{String(item.sort_order ?? 0)}</td>
+      <td><span className={`status-tag gallery-admin-status ${item.is_published === true ? "published" : "unpublished"}`}>{item.is_published === true ? "Published" : "Hidden"}</span></td>
+      <td>{date(item.created_at)}</td>
+      <td><div className="table-actions">
+        <button className="button button-outline button-small" type="button" aria-expanded={editing} aria-controls={editId} disabled={busy} onClick={() => editing ? cancelEdit() : setEditing(true)}><Pencil size={14} /> {editing ? "Cancel" : "Edit"}</button>
+        <button className="button button-outline button-small danger-button" type="button" disabled={busy} onClick={() => void remove()}><Trash2 size={14} /> Delete</button>
+      </div></td>
+    </tr>
+    <tr className="gallery-admin-edit-row" hidden={!editing}>
+      <td colSpan={6}>
+        <form id={editId} className="gallery-admin-edit-form" onSubmit={(event) => void update(event)}>
+          <Field label="Image title and alt text" value={title} onChange={setTitle} required />
+          <Field label="Caption" value={description} onChange={setDescription} area />
+          <Field label="Display order" value={sortOrder} onChange={setSortOrder} type="number" min="0" />
+          <label className="check-field"><input type="checkbox" checked={published} onChange={(event) => setPublished(event.target.checked)} /> Published on public homepage</label>
+          <div className="wizard-actions">
+            <button className="button button-outline button-small" type="button" disabled={busy} onClick={cancelEdit}>Cancel</button>
+            <button className="button button-primary button-small" disabled={busy}>{busy ? "Saving…" : "Save changes"}</button>
+          </div>
+        </form>
+      </td>
+    </tr>
+  </>;
 }
 
 function CertificatesManager({ records, students, onRefresh }: { records: JsonRecord[]; students: JsonRecord[]; onRefresh: () => void }) {
