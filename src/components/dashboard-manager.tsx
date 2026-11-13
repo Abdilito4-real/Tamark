@@ -83,12 +83,15 @@ export function DashboardManager({ kind, section }: Props) {
   async function mutate(url: string, method: "POST" | "PATCH" | "DELETE", body?: JsonRecord) {
     setSaving(true); setError("");
     try {
-      await requestJson(url, { method, ...(body ? { body: JSON.stringify(body) } : {}) });
-      toast({ kind: "success", title: "Changes saved" });
+      const result = await requestJson<{ warning?: string }>(url, { method, ...(body ? { body: JSON.stringify(body) } : {}) });
+      toast(result.warning
+        ? { kind: "info", title: "Changes saved with a warning", description: result.warning }
+        : { kind: "success", title: "Changes saved" });
       setEditing(null);
       setRefresh((value) => value + 1);
     } catch (reason) {
       toast({ kind: "error", title: "Could not save changes", description: reason instanceof Error ? reason.message : "Please try again." });
+      if (method === "DELETE") setRefresh((value) => value + 1);
     } finally {
       setSaving(false);
     }
@@ -97,7 +100,7 @@ export function DashboardManager({ kind, section }: Props) {
   if (loading) return <p className="muted" role="status">Loading records…</p>;
   return <div className="dashboard-manager">
     {error && <Notice title="Action could not be completed">{error}</Notice>}
-    {kind === "admin" && section === "programmes" && <ProgrammeManager programmes={data as unknown as Programme[]} editing={editing} setEditing={setEditing} saving={saving} onSave={(body, id) => mutate(`/api/admin/programmes${id ? `/${id}` : ""}`, id ? "PATCH" : "POST", body)} onUnpublish={(id) => void mutate(`/api/admin/programmes/${id}`, "DELETE")} />}
+    {kind === "admin" && section === "programmes" && <ProgrammeManager programmes={data as unknown as Programme[]} editing={editing} setEditing={setEditing} saving={saving} onSave={(body, id) => mutate(`/api/admin/programmes${id ? `/${id}` : ""}`, id ? "PATCH" : "POST", body)} onUnpublish={(id) => void mutate(`/api/admin/programmes/${id}`, "PATCH", { is_published: false })} onDelete={(id) => void mutate(`/api/admin/programmes/${id}`, "DELETE")} />}
     {kind === "admin" && section === "applications" && <ApplicationsManager records={data} saving={saving} onDecision={(id, status, expectedUpdatedAt) => void mutate(`/api/admin/applications/${id}`, "PATCH", { status, expectedUpdatedAt })} />}
     {kind === "admin" && section === "students" && <StudentsManager records={data} />}
     {kind === "admin" && section === "gallery" && <GalleryManager records={data} onRefresh={() => setRefresh((value) => value + 1)} />}
@@ -115,8 +118,8 @@ export function DashboardManager({ kind, section }: Props) {
   </div>;
 }
 
-function ProgrammeManager({ programmes, editing, setEditing, saving, onSave, onUnpublish }: {
-  programmes: Programme[]; editing: JsonRecord | null; setEditing: (value: JsonRecord | null) => void; saving: boolean; onSave: (body: JsonRecord, id?: string) => Promise<void>; onUnpublish: (id: string) => void;
+function ProgrammeManager({ programmes, editing, setEditing, saving, onSave, onUnpublish, onDelete }: {
+  programmes: Programme[]; editing: JsonRecord | null; setEditing: (value: JsonRecord | null) => void; saving: boolean; onSave: (body: JsonRecord, id?: string) => Promise<void>; onUnpublish: (id: string) => void; onDelete: (id: string) => void;
 }) {
   return <>
     <div className="manager-heading"><p>Publish a programme when its training information is ready for applications.</p><button className="button button-primary" type="button" onClick={() => setEditing({})}><Plus size={16} /> Add programme</button></div>
@@ -130,19 +133,22 @@ function ProgrammeManager({ programmes, editing, setEditing, saving, onSave, onU
       const isEditing = editing?.id === p.id;
       return <Fragment key={p.id}>
         <tr>
-          <td><span className="programme-admin-thumb" role={imageUrl ? "img" : undefined} aria-label={imageUrl ? `${p.name} image` : undefined} style={imageUrl ? { backgroundImage: `url("${imageUrl}")` } : undefined}>{!imageUrl && <ImagePlus size={22} aria-hidden="true" />}</span></td>
-          <td className="programme-admin-details">
+          <td data-label="Image"><span className="programme-admin-thumb" role={imageUrl ? "img" : undefined} aria-label={imageUrl ? `${p.name} image` : undefined} style={imageUrl ? { backgroundImage: `url("${imageUrl}")` } : undefined}>{!imageUrl && <ImagePlus size={22} aria-hidden="true" />}</span></td>
+          <td className="programme-admin-details" data-label="Programme">
             <strong>{p.name}</strong>
             <span className="programme-admin-category">{p.category || "Uncategorized"}</span>
             <span className="programme-admin-slug">/{p.slug}</span>
             <p>{p.summary || "Programme description not added yet."}</p>
           </td>
-          <td>{p.duration || "Not set"}</td>
-          <td><span className={`status-tag ${p.is_published ? "status-published" : "status-draft"}`}>{p.is_published ? "Published" : "Draft"}</span></td>
-          <td><span className={`status-tag programme-catalogue-status ${p.is_listed ? "listed" : "hidden"}`}>{p.is_listed ? "Listed" : "Hidden"}</span></td>
-          <td><div className="table-actions programme-admin-actions">
+          <td data-label="Duration">{p.duration || "Not set"}</td>
+          <td data-label="Publication"><span className={`status-tag ${p.is_published ? "status-published" : "status-draft"}`}>{p.is_published ? "Published" : "Draft"}</span></td>
+          <td data-label="Catalogue"><span className={`status-tag programme-catalogue-status ${p.is_listed ? "listed" : "hidden"}`}>{p.is_listed ? "Listed" : "Hidden"}</span></td>
+          <td data-label="Actions"><div className="table-actions programme-admin-actions">
             <button className="button button-outline button-small" type="button" disabled={saving} aria-expanded={isEditing} aria-controls={`programme-edit-${p.id}`} onClick={() => setEditing(isEditing ? null : { ...p, curriculum: p.curriculum.join("\n"), outcomes: p.outcomes.join("\n") })}><Pencil size={14} /> {isEditing ? "Cancel" : "Edit"}</button>
             {p.is_published && <button className="button button-outline button-small" type="button" disabled={saving} onClick={() => onUnpublish(p.id)}>Unpublish</button>}
+            <button className="button button-outline button-small danger-button" type="button" disabled={saving} onClick={() => {
+              if (window.confirm(`Permanently delete "${p.name}"? Programmes with applications cannot be deleted.`)) onDelete(p.id);
+            }}><Trash2 size={14} /> Delete</button>
           </div></td>
         </tr>
         <tr id={`programme-edit-${p.id}`} className="programme-admin-edit-row" hidden={!isEditing}>

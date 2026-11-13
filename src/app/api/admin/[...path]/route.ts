@@ -286,10 +286,38 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
   const [resource, id] = path;
   if (!resource) return fail("Dashboard resource is required.", 404);
   if (resource === "programmes" && id) {
-    const { data, error } = await db.from("programmes").update({ is_published: false, updated_at: new Date().toISOString() }).eq("id", id).select("id").maybeSingle();
-    if (error) return fail("Could not unpublish programme.", 500);
+    const { data: existing, error: existingError } = await db.from("programmes").select("id,name,slug").eq("id", id).maybeSingle();
+    if (existingError) return fail("Could not load programme before deletion.", 500);
+    if (!existing) return fail("Programme not found.", 404);
+    const { data: linkedApplication, error: applicationError } = await db.from("applications")
+      .select("id")
+      .eq("programme_id", id)
+      .limit(1)
+      .maybeSingle();
+    if (applicationError) return fail("Could not check whether applications reference this programme.", 500);
+    if (linkedApplication) return fail("This programme has applications and cannot be deleted. Unpublish it to keep its application history.", 409);
+
+    const { data, error } = await db.from("programmes").delete().eq("id", id).select("id,name,slug,image_path").maybeSingle();
+    if (error) {
+      if (error.code === "23503") return fail("This programme has applications and cannot be deleted. Unpublish it to keep its application history.", 409);
+      return fail("Could not delete programme.", 500);
+    }
     if (!data) return fail("Programme not found.", 404);
-    return NextResponse.json({ data });
+    let warning: string | undefined;
+    if (data.image_path) {
+      const { error: storageError } = await db.storage.from("programme-images").remove([data.image_path]);
+      if (storageError) {
+        console.error("Programme was deleted but its image could not be removed:", storageError.message);
+        warning = "The programme was deleted, but its image could not be removed from storage. Contact the administrator.";
+      }
+    }
+    await writeAuditLog({
+      actorId: context.user.id,
+      eventType: "programme.deleted",
+      relatedRecordId: data.id,
+      metadata: { name: data.name, slug: data.slug },
+    });
+    return NextResponse.json({ success: true, ...(warning ? { warning } : {}) });
   }
   if (resource === "announcements" && id) {
     const { error } = await db.from("announcements").delete().eq("id", id);

@@ -468,6 +468,30 @@ tr:last-child td { border-bottom: 0; }
   .wizard-step { flex: 0 0 auto; }.wizard-step:not(.active) { font-size: 0; }.wizard-step span:first-child { font-size: 12px; }
   .wizard-main { width: 100%; padding: 34px 24px 54px; }
 }
+@media (max-width: 700px) {
+  .programme-admin-table-wrap { overflow: visible; border: 0; background: transparent; }
+  .programme-admin-table { display: block; min-width: 0; }
+  .programme-admin-table thead { display: none; }
+  .programme-admin-table tbody { display: grid; gap: 12px; }
+  .programme-admin-table tbody > tr:not(.programme-admin-edit-row) { display: grid; grid-template-columns: 82px minmax(0, 1fr); grid-template-areas: "image details" "duration duration" "publication catalogue" "actions actions"; gap: 6px 12px; padding: 13px; border: 1px solid var(--bd); border-radius: 14px; background: white; box-shadow: 0 7px 22px rgba(16, 42, 42, .04); }
+  .programme-admin-table tbody td { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 0; border: 0; white-space: normal; }
+  .programme-admin-table tbody td::before { color: var(--mu); font-size: 10px; font-weight: 700; }
+  .programme-admin-table tbody td:nth-child(1) { grid-area: image; justify-content: flex-start; align-self: start; padding: 0; }
+  .programme-admin-table tbody td:nth-child(1)::before, .programme-admin-table tbody td:nth-child(2)::before, .programme-admin-table tbody td:nth-child(6)::before { display: none; }
+  .programme-admin-table tbody td:nth-child(2) { grid-area: details; display: block; }
+  .programme-admin-table tbody td:nth-child(3) { grid-area: duration; margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--bd); }
+  .programme-admin-table tbody td:nth-child(3)::before { content: attr(data-label); }
+  .programme-admin-table tbody td:nth-child(4) { grid-area: publication; }
+  .programme-admin-table tbody td:nth-child(4)::before { content: attr(data-label); }
+  .programme-admin-table tbody td:nth-child(5) { grid-area: catalogue; }
+  .programme-admin-table tbody td:nth-child(5)::before { content: attr(data-label); }
+  .programme-admin-table tbody td:nth-child(6) { grid-area: actions; padding-top: 8px; border-top: 1px solid var(--bd); }
+  .programme-admin-actions { width: 100%; flex-wrap: wrap; }
+  .programme-admin-actions .button { min-height: 44px; flex: 1 1 auto; }
+  .programme-admin-table tbody > tr.programme-admin-edit-row:not([hidden]) { display: block; padding: 0; border: 0; background: transparent; box-shadow: none; }
+  .programme-admin-edit-row > td { display: block; padding: 0; }
+  .programme-admin-edit-row > td::before { display: none; }
+}
 @media (max-width: 600px) {
   .container { width: min(100% - 32px, 1180px); }
   .section { padding-block: 62px; }.hero h1 { font-size: clamp(40px, 12vw, 58px); }
@@ -522,6 +546,7 @@ tr:last-child td { border-bottom: 0; }
   .schedule-admin-title, .student-schedule-heading { flex-wrap: wrap; }
   .table-actions .button, .admin-card-actions .button { min-height: 44px; }
   .manager-heading { align-items: start; flex-direction: column; }
+  .manager-heading .button { width: 100%; min-height: 44px; }
   .message-header { flex-direction: column; }
 }
 @media (max-width: 480px) {

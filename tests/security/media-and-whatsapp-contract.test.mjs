@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [galleryAdmin, galleryItemAdmin, certificateAdmin, certificateDownload, studentApi, galleryData, migration, dashboardManager, toastProvider, rootLayout, styles, passwordField, authForm, passwordReset] = await Promise.all([
+const [galleryAdmin, galleryItemAdmin, certificateAdmin, certificateDownload, studentApi, galleryData, migration, dashboardManager, toastProvider, rootLayout, styles, passwordField, authForm, passwordReset, adminResourceRoute] = await Promise.all([
   read("../../src/app/api/admin/gallery/route.ts"),
   read("../../src/app/api/admin/gallery/[id]/route.ts"),
   read("../../src/app/api/admin/certificates/route.ts"),
@@ -18,6 +18,7 @@ const [galleryAdmin, galleryItemAdmin, certificateAdmin, certificateDownload, st
   read("../../src/components/password-field.tsx"),
   read("../../src/components/auth-form.tsx"),
   read("../../src/components/password-reset-form.tsx"),
+  read("../../src/app/api/admin/[...path]/route.ts"),
 ]);
 
 test("gallery writes require an admin and validate image type, signature, and size", () => {
@@ -69,13 +70,26 @@ test("admin training programme CRUD uses a detailed responsive table", () => {
   assert.match(programmeManager, /<th scope="col">Publication<\/th>/);
   assert.match(programmeManager, /<th scope="col">Catalogue<\/th>/);
   assert.match(programmeManager, /<th scope="col">Actions<\/th>/);
+  assert.match(programmeManager, /data-label="Duration"/);
+  assert.match(programmeManager, /data-label="Publication"/);
+  assert.match(programmeManager, /data-label="Catalogue"/);
   assert.match(programmeManager, /programme-admin-slug/);
   assert.match(programmeManager, /aria-expanded=\{isEditing\}/);
   assert.match(programmeManager, /<ProgrammeForm value=\{editing\} saving=\{saving\} onCancel/);
   assert.match(programmeManager, /onSave=\{\(body\) => onSave\(body, p\.id\)\}/);
   assert.match(programmeManager, /onUnpublish\(p\.id\)/);
+  assert.match(programmeManager, /Permanently delete/);
+  assert.match(programmeManager, /onDelete\(p\.id\)/);
+  assert.match(dashboardManager, /onUnpublish=\{\(id\) => void mutate\(`\/api\/admin\/programmes\/\$\{id\}`, "PATCH", \{ is_published: false \}\)\}/);
+  assert.match(adminResourceRoute, /from\("applications"\)[\s\S]*eq\("programme_id", id\)[\s\S]*cannot be deleted[\s\S]*409/);
+  assert.match(adminResourceRoute, /from\("programmes"\)\.delete\(\)/);
+  assert.match(adminResourceRoute, /programme-images"\)\.remove\(\[data\.image_path\]\)/);
+  assert.match(adminResourceRoute, /eventType: "programme\.deleted"/);
+  assert.match(dashboardManager, /Changes saved with a warning/);
   assert.match(styles, /\.programme-admin-table\s*\{\s*min-width:\s*1000px/);
   assert.match(styles, /\.programme-admin-table-wrap\s*\{\s*margin-top:\s*20px/);
+  assert.match(styles, /@media \(max-width: 700px\)[\s\S]*programme-admin-table tbody > tr:not\(\.programme-admin-edit-row\)[\s\S]*grid-template-areas: "image details" "duration duration" "publication catalogue" "actions actions"/);
+  assert.match(styles, /\.programme-admin-actions \.button \{\s*min-height:\s*44px/);
 });
 
 test("WhatsApp settings prefill Nigeria's country code when no destination is saved", () => {
