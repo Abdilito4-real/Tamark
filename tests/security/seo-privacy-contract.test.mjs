@@ -24,8 +24,8 @@ test("public page metadata uses canonical URLs, descriptive social metadata, and
   assert.match(seo, /openGraph:/);
   assert.match(seo, /twitter:/);
   assert.match(home, /title:\s*"Solar Energy Solutions and Training"/);
-  assert.match(training, /indexable:\s*programme\.is_published === true && programme\.price_approved === true/);
-  assert.match(training, /programme\.is_published && programme\.price_approved/);
+  assert.match(training, /indexable:\s*programme\.is_published === true/);
+  assert.match(training, /programme\.is_published \? <ButtonLink/);
 });
 
 test("production SEO prefers valid canonical URLs and falls back to Vercel for invalid configuration", () => {
@@ -75,11 +75,16 @@ test("robots and sitemap expose only intended public URLs while private endpoint
     "../../src/app/sign-up/page.tsx",
     "../../src/app/reset-password/page.tsx",
     "../../src/app/apply/page.tsx",
-    "../../src/app/checkout/[applicationId]/page.tsx",
-    "../../src/app/checkout/confirmation/page.tsx",
     "../../src/app/access-denied/page.tsx",
   ]) {
     assert.match(await readSource(route), /indexable:\s*false/, route);
+  }
+  for (const removedRoute of [
+    "../../src/app/checkout/[applicationId]/page.tsx",
+    "../../src/app/checkout/confirmation/page.tsx",
+    "../../src/app/api/payments/initialize/route.ts",
+  ]) {
+    await assert.rejects(readSource(removedRoute), { code: "ENOENT" }, removedRoute);
   }
 });
 

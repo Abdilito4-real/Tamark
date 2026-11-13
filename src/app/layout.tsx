@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { CookieConsentProvider } from "@/components/cookie-consent";
 import { InstallPromptBanner } from "@/components/install-prompt-banner";
+import { ToastProvider } from "@/components/toast-provider";
 import { DEFAULT_DESCRIPTION, getSiteOrigin, SITE_NAME, SOCIAL_IMAGE } from "@/lib/seo";
 import "./globals.css";
 
@@ -36,5 +37,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body className={jakarta.variable}><CookieConsentProvider>{children}<InstallPromptBanner /></CookieConsentProvider></body></html>;
+  return <html lang="en"><body className={jakarta.variable}><CookieConsentProvider><ToastProvider>{children}<InstallPromptBanner /></ToastProvider></CookieConsentProvider></body></html>;
 }

@@ -46,7 +46,7 @@ test("administrator decisions require and compare the record version", () => {
   assert.match(dashboard, /String\(row\.updated_at\)/);
 });
 
-test("application draft writes use optimistic versions and preserve conflicting server data", () => {
+test("authenticated draft writes retain optimistic versions and the public form submits idempotently", () => {
   assert.match(draftMigration, /p_expected_updated_at timestamptz/);
   assert.match(draftMigration, /application_row\.updated_at is distinct from p_expected_updated_at/i);
   assert.match(draftMigration, /errcode = '40001'[\s\S]*Application draft changed/i);
@@ -55,6 +55,6 @@ test("application draft writes use optimistic versions and preserve conflicting 
   assert.match(applicationsRoute, /p_expected_updated_at: expectedUpdatedAt \?\? null/);
   assert.match(applicationsRoute, /\.eq\("student_id", user\.id\)[\s\S]*\.eq\("programme_id", body\.programmeId\)/);
   assert.match(applicationsRoute, /currentDraft,\s*\}, \{ status: 409 \}\)/);
-  assert.match(applicationWizard, /expectedUpdatedAt: serverUpdatedAt/);
-  assert.match(applicationWizard, /Load latest saved draft/);
+  assert.match(applicationWizard, /\/api\/applications\/guest/);
+  assert.match(applicationWizard, /idempotencyKey/);
 });

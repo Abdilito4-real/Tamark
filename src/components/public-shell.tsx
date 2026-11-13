@@ -7,6 +7,7 @@ import { CookiePreferencesLink } from "@/components/cookie-consent";
 const publicLinks = [
   ["About", "/#about"],
   ["Services", "/#services"],
+  ["Gallery", "/#gallery"],
   ["Training", "/training"],
   ["Contact", "/#contact"],
 ];

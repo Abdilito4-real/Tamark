@@ -4,20 +4,21 @@ import { createSupabaseServerClient } from "@/lib/supabase";
 import { DashboardManager } from "@/components/dashboard-manager";
 
 const studentSections: Record<string, { title: string; description: string }> = {
-  overview: { title: "Overview", description: "Your applications, payments, and programme information will appear here." },
+  overview: { title: "Overview", description: "Your applications, certificates, and programme information will appear here." },
   applications: { title: "My Applications", description: "Review the status and details of your applications." },
-  payments: { title: "My Payments", description: "View verified payments and download receipts." },
+  certificates: { title: "My Certificates", description: "View certificates issued to you by Tamark." },
   schedule: { title: "Training Schedule", description: "Your confirmed training schedule will appear here." },
   notifications: { title: "Notifications", description: "Important updates about your applications and training." },
   profile: { title: "My Profile", description: "Manage your account details." },
 };
 const adminSections: Record<string, { title: string; description: string }> = {
-  dashboard: { title: "Dashboard", description: "Current application, student, and payment summaries." },
+  dashboard: { title: "Dashboard", description: "Current application and student summaries." },
   applications: { title: "Applications", description: "Review and manage submitted applications." },
   students: { title: "Students", description: "Manage student accounts and records." },
-  programmes: { title: "Training Programmes", description: "Manage programme details, pricing, and publication status." },
-  payments: { title: "Payments", description: "Review verified payment records." },
-  reports: { title: "Reports", description: "Reports are generated from live records." },
+  programmes: { title: "Training Programmes", description: "Manage programme details and publication status." },
+  reports: { title: "Reports", description: "Application and student reports are generated from live records." },
+  gallery: { title: "Gallery", description: "Manage photos shown on the public website." },
+  certificates: { title: "Certificates", description: "Issue private certificates to students." },
   announcements: { title: "Announcements", description: "Manage announcements for authenticated students." },
   settings: { title: "Settings", description: "Manage organization and application settings." },
 };

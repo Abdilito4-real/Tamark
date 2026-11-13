@@ -18,15 +18,15 @@ export async function POST(
   if (!allowed) return NextResponse.json({ error: "Too many submission attempts. Try again shortly." }, { status: 429 });
 
   const { applicationId } = await params;
-  const { data, error } = await context.supabase.rpc("submit_paid_application", {
+  const { data, error } = await context.supabase.rpc("submit_student_application", {
     p_application_id: applicationId,
   });
   if (error) {
     if (error.message.includes("not found")) return NextResponse.json({ error: "Application was not found." }, { status: 404 });
-    if (error.message.includes("verified payment") || error.message.includes("not a draft")) {
-      return NextResponse.json({ error: "A successful payment is required before this draft can be submitted." }, { status: 409 });
+    if (error.message.includes("not a draft")) {
+      return NextResponse.json({ error: "This application can no longer be submitted." }, { status: 409 });
     }
-    console.error("Could not submit paid application:", error.message);
+    console.error("Could not submit application:", error.message);
     return NextResponse.json({ error: "Could not submit your application." }, { status: 500 });
   }
   const result = Array.isArray(data) ? data[0] : data;

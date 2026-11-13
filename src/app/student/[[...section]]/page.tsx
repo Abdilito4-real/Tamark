@@ -14,7 +14,7 @@ export const metadata: Metadata = createPageMetadata({
 const routeSections: Record<string, string> = {
   "": "overview",
   applications: "applications",
-  payments: "payments",
+  certificates: "certificates",
   schedule: "schedule",
   notifications: "notifications",
   profile: "profile",

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, LayoutDashboard, BookOpen, Users, CreditCard, ChartNoAxesColumn, Megaphone, Settings, Bell, CalendarDays, UserRound } from "lucide-react";
+import { ArrowLeft, LayoutDashboard, BookOpen, Users, ChartNoAxesColumn, Megaphone, Settings, Bell, CalendarDays, UserRound, Images, Award } from "lucide-react";
 import type { ReactNode } from "react";
 import { SignOutButton } from "@/components/sign-out-button";
 import { MobileDrawer } from "@/components/mobile-drawer";
@@ -8,7 +8,7 @@ import { BrandMark } from "@/components/brand-mark";
 const studentItems = [
   ["Overview", "/student", LayoutDashboard],
   ["My Applications", "/student/applications", BookOpen],
-  ["My Payments", "/student/payments", CreditCard],
+  ["Certificates", "/student/certificates", Award],
   ["Training Schedule", "/student/schedule", CalendarDays],
   ["Notifications", "/student/notifications", Bell],
   ["My Profile", "/student/profile", UserRound],
@@ -18,8 +18,9 @@ const adminItems = [
   ["Applications", "/admin/applications", BookOpen],
   ["Students", "/admin/students", Users],
   ["Training Programmes", "/admin/programmes", Sun],
-  ["Payments", "/admin/payments", CreditCard],
   ["Reports", "/admin/reports", ChartNoAxesColumn],
+  ["Gallery", "/admin/gallery", Images],
+  ["Certificates", "/admin/certificates", Award],
   ["Announcements", "/admin/announcements", Megaphone],
   ["Settings", "/admin/settings", Settings],
 ] as const;

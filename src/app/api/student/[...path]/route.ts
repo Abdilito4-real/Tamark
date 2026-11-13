@@ -14,33 +14,32 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
   const { path: [resource] } = await params;
 
   if (resource === "overview") {
-    const [applications, payments, verifiedPayments, notifications] = await Promise.all([
+    const [applications, certificates, notifications] = await Promise.all([
       supabase.from("applications").select("id,status,created_at,submitted_at,programmes(name)", { count: "exact" }).order("created_at", { ascending: false }).limit(5),
-      supabase.from("payments").select("id,amount_minor,currency,status,verified_at,provider_reference,created_at", { count: "exact" }).order("created_at", { ascending: false }).limit(5),
-      supabase.from("payments").select("id", { count: "exact", head: true }).eq("status", "successful"),
+      supabase.from("certificates").select("id", { count: "exact", head: true }),
       supabase.from("notifications").select("id", { count: "exact", head: true }).is("read_at", null),
     ]);
-    const error = applications.error ?? payments.error ?? verifiedPayments.error ?? notifications.error;
+    const error = applications.error ?? certificates.error ?? notifications.error;
     if (error) return failure("Could not load student dashboard.", 500);
     return NextResponse.json({
       applications: applications.data ?? [],
-      payments: payments.data ?? [],
       unread: notifications.count ?? 0,
-      stats: { applications: applications.count ?? 0, verifiedPayments: verifiedPayments.count ?? 0 },
+      stats: { applications: applications.count ?? 0, certificates: certificates.count ?? 0 },
     });
   }
   if (resource === "applications") {
     const { data, error } = await supabase.from("applications")
-      .select("id,status,created_at,submitted_at,application_reference,programmes(name),payments(status)")
+      .select("id,status,created_at,submitted_at,application_reference,programmes(name)")
       .order("created_at", { ascending: false }).limit(500);
     if (error) return failure("Could not load applications.", 500);
     return NextResponse.json({ data: data ?? [] });
   }
-  if (resource === "payments") {
-    const { data, error } = await supabase.from("payments")
-      .select("id,amount_minor,currency,status,verified_at,provider_reference,created_at")
-      .order("created_at", { ascending: false }).limit(500);
-    if (error) return failure("Could not load payments.", 500);
+  if (resource === "certificates") {
+    const { data, error } = await supabase.from("certificates")
+      .select("id,title,programme_name,created_at")
+      .eq("student_id", context.user.id)
+      .order("created_at", { ascending: false }).limit(100);
+    if (error) return failure("Could not load your certificates.", 500);
     return NextResponse.json({ data: data ?? [] });
   }
   if (resource === "profile") {

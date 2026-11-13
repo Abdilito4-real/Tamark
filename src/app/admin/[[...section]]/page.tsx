@@ -16,8 +16,9 @@ const routeSections: Record<string, string> = {
   applications: "applications",
   students: "students",
   programmes: "programmes",
-  payments: "payments",
   reports: "reports",
+  gallery: "gallery",
+  certificates: "certificates",
   announcements: "announcements",
   settings: "settings",
 };

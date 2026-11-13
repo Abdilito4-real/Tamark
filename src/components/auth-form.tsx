@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { PasswordField } from "@/components/password-field";
 
 export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const router = useRouter();
@@ -46,7 +47,8 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   return <form className="form-card" onSubmit={submit}>
     {signUp && <label className="field">Full name<input autoComplete="name" value={fullName} onChange={(event) => setFullName(event.target.value)} required /></label>}
     <label className="field">Email address<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></label>
-    <label className="field">Password<input type="password" autoComplete={signUp ? "new-password" : "current-password"} minLength={signUp ? 12 : undefined} value={password} onChange={(event) => setPassword(event.target.value)} required />{signUp && <small className="muted">Use at least 12 characters. Configure the same minimum in Supabase Auth.</small>}</label>
+    <PasswordField label="Password" autoComplete={signUp ? "new-password" : "current-password"} minLength={signUp ? 8 : undefined} value={password} onChange={setPassword} required />
+    {signUp && <small className="muted password-field-note">Use at least 8 characters. Configure the same minimum in Supabase Auth.</small>}
     {error && <p className="wizard-error" role="alert">{error}</p>}
     {message && <p className="notice" role="status">{message}</p>}
     <button className="button button-primary" type="submit" disabled={busy}>{busy ? "Please wait…" : signUp ? "Create account" : "Sign in"}</button>

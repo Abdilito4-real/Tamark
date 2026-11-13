@@ -9,6 +9,7 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import { getPublicOrganizationSettings } from "@/lib/organization";
 import { JsonLd } from "@/components/json-ld";
 import { getSiteOrigin } from "@/lib/seo";
+import { getGalleryImageUrl, getPublishedGalleryItems } from "@/lib/gallery";
 
 const services = [
   { title: "Solar Installation", text: "Rooftop and ground-mounted solar systems designed around real energy needs.", Icon: Sun },
@@ -18,7 +19,7 @@ const services = [
 ];
 
 export async function HomePage() {
-  const [programmes, organization] = await Promise.all([getPublishedProgrammes(), getPublicOrganizationSettings()]);
+  const [programmes, organization, galleryItems] = await Promise.all([getPublishedProgrammes(), getPublicOrganizationSettings(), getPublishedGalleryItems()]);
   const origin = getSiteOrigin();
   return (
     <>
@@ -103,6 +104,19 @@ export async function HomePage() {
             <div className="services-grid">
               {services.map(({ title, text, Icon }) => <article className="service-card" key={title}><span className="service-icon"><Icon size={25} /></span><h3>{title}</h3><p className="muted">{text}</p></article>)}
             </div>
+          </div>
+        </section>
+
+        <section className="section" id="gallery">
+          <div className="container">
+            <SectionHeading eyebrow="OUR WORK" title="Gallery">A look at Tamark&apos;s solar projects and training experiences.</SectionHeading>
+            {galleryItems.length ? <div className="gallery-grid">{galleryItems.map((item) => {
+              const imageUrl = getGalleryImageUrl(item.image_path);
+              return imageUrl ? <figure className="gallery-card" key={item.id}>
+                <div className="gallery-image"><Image src={imageUrl} alt={item.title} fill sizes="(max-width: 700px) 100vw, (max-width: 1000px) 50vw, 33vw" unoptimized /></div>
+                <figcaption><strong>{item.title}</strong>{item.description && <span>{item.description}</span>}</figcaption>
+              </figure> : null;
+            })}</div> : <p className="muted">Approved project and training photos will appear here.</p>}
           </div>
         </section>
 

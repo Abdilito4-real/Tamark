@@ -9,7 +9,8 @@ import { isPastIsoDate } from "@/lib/validation";
 import { BrandMark } from "@/components/brand-mark";
 
 const STORAGE_KEY = "tamark-application-draft-v1";
-const steps = ["Personal information", "Contact information", "Programme", "Review", "Payment"];
+const SUBMISSION_KEY_STORAGE_KEY = "tamark-application-submission-key-v1";
+const steps = ["Personal information", "Contact information", "Programme", "Review & send"];
 type Draft = {
   firstName: string;
   lastName: string;
@@ -20,30 +21,26 @@ type Draft = {
   address: string;
   programmeId: string;
 };
-type ServerDraft = {
-  id: string;
-  updated_at: string;
-  personal_details: Record<string, unknown> | null;
-  contact_details: Record<string, unknown> | null;
-};
 const emptyDraft: Draft = {
   firstName: "", lastName: "", dateOfBirth: "", gender: "",
   email: "", phone: "", address: "",
   programmeId: "",
 };
 
-function currency(amount: number, currencyCode: string) {
-  return new Intl.NumberFormat(undefined, { style: "currency", currency: currencyCode }).format(amount / 100);
-}
-
 export function ApplicationWizard({
   programmes,
   defaultSlug,
   initialEmail,
+  initialFirstName,
+  initialLastName,
+  initialPhone,
 }: {
   programmes: Programme[];
   defaultSlug?: string;
   initialEmail: string;
+  initialFirstName: string;
+  initialLastName: string;
+  initialPhone: string;
 }) {
   const [form, setForm] = useState<Draft>(emptyDraft);
   const [loaded, setLoaded] = useState(false);
@@ -51,73 +48,44 @@ export function ApplicationWizard({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [applicationId, setApplicationId] = useState("");
-  const [serverUpdatedAt, setServerUpdatedAt] = useState("");
-  const [serverConflict, setServerConflict] = useState<ServerDraft | null>(null);
 
   useEffect(() => {
     try {
       const savedDraft = window.localStorage.getItem(STORAGE_KEY);
-      const parsed = savedDraft ? JSON.parse(savedDraft) as Partial<Draft> & { applicationId?: unknown; serverUpdatedAt?: unknown } : {};
+      const parsed = savedDraft ? JSON.parse(savedDraft) as Partial<Draft> : {};
       const slugProgramme = programmes.find((programme) => programme.slug === defaultSlug);
       const savedText = (value: unknown) => typeof value === "string" ? value : "";
       setForm({
-        firstName: savedText(parsed.firstName),
-        lastName: savedText(parsed.lastName),
+        firstName: savedText(parsed.firstName) || initialFirstName,
+        lastName: savedText(parsed.lastName) || initialLastName,
         dateOfBirth: savedText(parsed.dateOfBirth),
         gender: savedText(parsed.gender),
         email: savedText(parsed.email) || initialEmail,
-        phone: savedText(parsed.phone).replace(/\D/g, "").slice(0, 15),
+        phone: savedText(parsed.phone).replace(/\D/g, "").slice(0, 15) || initialPhone.replace(/\D/g, "").slice(0, 15),
         address: savedText(parsed.address),
         programmeId: savedText(parsed.programmeId) || slugProgramme?.id || "",
       });
-      if (typeof parsed.applicationId === "string" && typeof parsed.serverUpdatedAt === "string") {
-        setApplicationId(parsed.applicationId);
-        setServerUpdatedAt(parsed.serverUpdatedAt);
-      }
       setLoaded(true);
     } catch {
       setError("Your saved draft could not be read. Clear this site's saved application data and try again.");
       setLoaded(true);
     }
-  }, [defaultSlug, initialEmail, programmes]);
+  }, [defaultSlug, initialEmail, initialFirstName, initialLastName, initialPhone, programmes]);
 
   useEffect(() => {
     if (!loaded) return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...form, applicationId, serverUpdatedAt }));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(form));
       setSaved(true);
     } catch {
       setSaved(false);
       setError("Draft autosave is unavailable in this browser. Keep this page open while completing the application.");
     }
-  }, [applicationId, form, loaded, serverUpdatedAt]);
+  }, [form, loaded]);
 
   const selectedProgramme = useMemo(() => programmes.find((item) => item.id === form.programmeId), [form.programmeId, programmes]);
   function update<K extends keyof Draft>(key: K, value: Draft[K]) {
     setForm((current) => ({ ...current, [key]: value }));
-    if (key === "programmeId") {
-      setApplicationId("");
-      setServerUpdatedAt("");
-      setServerConflict(null);
-    }
-    setError("");
-  }
-  function loadLatestDraft(draft: ServerDraft) {
-    const text = (value: unknown) => typeof value === "string" ? value : "";
-    setForm((current) => ({
-      firstName: text(draft.personal_details?.firstName),
-      lastName: text(draft.personal_details?.lastName),
-      dateOfBirth: text(draft.personal_details?.dateOfBirth),
-      gender: text(draft.personal_details?.gender),
-      email: text(draft.contact_details?.email),
-      phone: text(draft.contact_details?.phone),
-      address: text(draft.contact_details?.address),
-      programmeId: current.programmeId,
-    }));
-    setApplicationId(draft.id);
-    setServerUpdatedAt(draft.updated_at);
-    setServerConflict(null);
     setError("");
   }
   function validStep() {
@@ -138,7 +106,7 @@ export function ApplicationWizard({
     setError("");
     setStep((current) => Math.min(current + 1, steps.length - 1));
   }
-  async function beginPayment() {
+  async function submitApplication() {
     if (!selectedProgramme) {
       setError("Select an available programme before continuing.");
       return;
@@ -146,44 +114,48 @@ export function ApplicationWizard({
     setBusy(true);
     setError("");
     try {
-      const applicationResponse = await fetch("/api/applications", {
+      const fingerprint = JSON.stringify({
+        programmeId: selectedProgramme.id,
+        personalDetails: { firstName: form.firstName.trim(), lastName: form.lastName.trim(), dateOfBirth: form.dateOfBirth, gender: form.gender },
+        contactDetails: { email: form.email.trim(), phone: form.phone, address: form.address.trim() },
+      });
+      const savedSubmission = window.localStorage.getItem(SUBMISSION_KEY_STORAGE_KEY);
+      let idempotencyKey: string;
+      try {
+        const parsed = savedSubmission ? JSON.parse(savedSubmission) as { fingerprint?: unknown; key?: unknown } : {};
+        idempotencyKey = parsed.fingerprint === fingerprint && typeof parsed.key === "string"
+          ? parsed.key
+          : window.crypto.randomUUID();
+        if (parsed.fingerprint !== fingerprint || parsed.key !== idempotencyKey) {
+          window.localStorage.setItem(SUBMISSION_KEY_STORAGE_KEY, JSON.stringify({ fingerprint, key: idempotencyKey }));
+        }
+      } catch {
+        idempotencyKey = window.crypto.randomUUID();
+        window.localStorage.setItem(SUBMISSION_KEY_STORAGE_KEY, JSON.stringify({ fingerprint, key: idempotencyKey }));
+      }
+
+      const applicationResponse = await fetch("/api/applications/guest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          idempotencyKey,
           programmeId: selectedProgramme.id,
           personalDetails: { firstName: form.firstName, lastName: form.lastName, dateOfBirth: form.dateOfBirth, gender: form.gender },
           contactDetails: { email: form.email.trim(), phone: form.phone, address: form.address.trim() },
-          ...(applicationId && serverUpdatedAt ? { applicationId, expectedUpdatedAt: serverUpdatedAt } : {}),
         }),
       });
       const applicationResult = await applicationResponse.json() as {
-        applicationId?: string;
-        updatedAt?: string;
-        currentDraft?: ServerDraft;
+        applicationReference?: string;
+        whatsappUrl?: string;
         error?: string;
       };
-      if (!applicationResponse.ok || !applicationResult.applicationId || !applicationResult.updatedAt) {
-        if (applicationResponse.status === 409 && applicationResult.currentDraft) {
-          setServerConflict(applicationResult.currentDraft);
-          setError("");
-          return;
-        }
-        throw new Error(applicationResult.error || "Could not save your application.");
+      if (!applicationResponse.ok || !applicationResult.applicationReference || !applicationResult.whatsappUrl) {
+        throw new Error(applicationResult.error || "Could not submit your application.");
       }
-      const currentApplicationId = applicationResult.applicationId;
-      setApplicationId(currentApplicationId);
-      setServerUpdatedAt(applicationResult.updatedAt);
-
-      const paymentResponse = await fetch("/api/payments/initialize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ applicationId: currentApplicationId }),
-      });
-      const paymentResult = await paymentResponse.json() as { authorizationUrl?: string; error?: string };
-      if (!paymentResponse.ok || !paymentResult.authorizationUrl) throw new Error(paymentResult.error || "Could not initialize payment.");
 
       window.localStorage.removeItem(STORAGE_KEY);
-      window.location.assign(paymentResult.authorizationUrl);
+      window.localStorage.removeItem(SUBMISSION_KEY_STORAGE_KEY);
+      window.location.assign(applicationResult.whatsappUrl);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Application could not be submitted.");
     } finally {
@@ -202,12 +174,8 @@ export function ApplicationWizard({
       <main className="wizard-main">
         <p className="eyebrow">APPLICATION · STEP {step + 1} OF {steps.length}</p>
         <h1>{steps[step]}</h1>
-        <p>Your progress is saved in this browser. No information is pre-filled.</p>
+        <p>You can apply without an account. If you are signed in, your name, email, and phone may be prefilled.</p>
         {saved && <p className="muted" aria-live="polite" style={{ fontSize: 11 }}>Draft autosaved on this device.</p>}
-        {serverConflict && <>
-          <Notice title="A newer server draft was found">Your current entries remain saved on this device. Load the latest server version before continuing.</Notice>
-          <button className="button button-outline button-small" type="button" onClick={() => loadLatestDraft(serverConflict)}>Load latest saved draft</button>
-        </>}
 
         {step === 0 && <div className="form-card">
           <div className="form-row">
@@ -225,33 +193,26 @@ export function ApplicationWizard({
         </div>}
         {step === 2 && <div className="form-card">
           {programmes.length ? <label className="field">Training programme<select value={form.programmeId} onChange={(event) => update("programmeId", event.target.value)} required><option value="">Select a programme</option>{programmes.map((programme) => <option key={programme.id} value={programme.id}>{programme.name}</option>)}</select></label> : <EmptyState title="No programmes are open">You can continue after Tamark publishes a training programme.</EmptyState>}
-          {selectedProgramme && <div className="checkout-summary"><strong>{selectedProgramme.name}</strong><p className="muted" style={{ margin: "5px 0 0", fontSize: 12 }}>{selectedProgramme.summary}</p></div>}
+          {selectedProgramme && <div className="info-summary"><strong>{selectedProgramme.name}</strong><p className="muted" style={{ margin: "5px 0 0", fontSize: 12 }}>{selectedProgramme.summary}</p></div>}
         </div>}
         {step === 3 && <div className="form-card">
-          <h2 style={{ fontSize: 18 }}>Review your details</h2>
+          <h2 style={{ fontSize: 18 }}>Review and send your application</h2>
           <Summary label="Name" value={`${form.firstName} ${form.lastName}`} />
           <Summary label="Email" value={form.email} />
           <Summary label="Phone" value={form.phone} />
           <Summary label="Programme" value={selectedProgramme?.name ?? "Not selected"} />
-          <Notice title="Your application is not submitted yet">Payment must be verified before your application is submitted.</Notice>
-        </div>}
-        {step === 4 && <div className="form-card">
-          <h2 style={{ fontSize: 18 }}>Secure payment</h2>
-          <p className="muted">Payment amount is set by Tamark. Prices are not displayed until an approved programme fee is available.</p>
-          {selectedProgramme && <div className="checkout-summary">
-            <Summary label="Programme" value={selectedProgramme.name} />
-            <Summary label="Programme fee" value={selectedProgramme.price_minor == null ? "Not yet approved" : currency(selectedProgramme.price_minor, selectedProgramme.currency)} />
-          </div>}
-          <Notice title="Verified payment required">You will be redirected to Paystack. Your application will only be submitted after the transaction is verified.</Notice>
-          <button className="button button-primary" type="button" disabled={busy || Boolean(serverConflict) || !selectedProgramme || selectedProgramme.price_minor == null || selectedProgramme.price_minor <= 0} onClick={beginPayment}>{busy ? "Starting secure checkout…" : "Continue to secure payment"} <ChevronRight size={17} /></button>
+          <Notice title="Continue on WhatsApp">Submitting saves your application first, then opens WhatsApp with your name, programme, and application reference. The WhatsApp contact is checked when you submit. No payment is collected through this website.</Notice>
         </div>}
 
         {error && <p className="wizard-error" role="alert">{error}</p>}
-        {step < 4 && <div className="wizard-actions">
+        {step < steps.length - 1 && <div className="wizard-actions">
           <button className="button button-outline" type="button" onClick={() => { setError(""); setStep((current) => Math.max(0, current - 1)); }} disabled={step === 0}><ChevronLeft size={17} /> Previous</button>
           <button className="button button-primary" type="button" onClick={next}>Continue <ChevronRight size={17} /></button>
         </div>}
-        {step === 4 && <div className="wizard-actions"><button className="button button-outline" type="button" onClick={() => { setError(""); setStep(3); }}><ChevronLeft size={17} /> Previous</button></div>}
+        {step === steps.length - 1 && <div className="wizard-actions">
+          <button className="button button-outline" type="button" onClick={() => { setError(""); setStep((current) => Math.max(0, current - 1)); }}><ChevronLeft size={17} /> Previous</button>
+          <button className="button button-primary" type="button" disabled={busy || !selectedProgramme} onClick={() => void submitApplication()}>{busy ? "Submitting…" : "Submit & continue to WhatsApp"} <ChevronRight size={17} /></button>
+        </div>}
       </main>
     </div>
   );

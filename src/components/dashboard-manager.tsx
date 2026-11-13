@@ -2,13 +2,14 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Bell, BookOpen, CalendarDays, Check, Clock3, CreditCard, Download, FileText, ImagePlus, KeyRound, Mail, MapPin, Pencil, Phone, Plus, RefreshCw, ShieldCheck, Trash2, UserRound } from "lucide-react";
+import { ArrowRight, Bell, BookOpen, CalendarDays, Check, Clock3, Download, FileText, ImagePlus, KeyRound, Mail, MapPin, Pencil, Phone, Plus, RefreshCw, ShieldCheck, Trash2, UserRound, Award } from "lucide-react";
 import { EmptyState, Notice } from "@/components/ui";
 import type { Programme } from "@/lib/programmes";
 import { getProgrammeImageUrl } from "@/lib/programme-images";
 import { PushNotificationControl } from "@/components/push-notification-control";
+import { useToast } from "@/components/toast-provider";
+import { PasswordField } from "@/components/password-field";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
-import { ApplicationSubmitAction } from "@/components/application-submit-action";
 
 type JsonRecord = Record<string, unknown>;
 type Props = { kind: "student" | "admin"; section: string };
@@ -25,14 +26,15 @@ function isRecord(value: unknown): value is JsonRecord {
 }
 
 export function DashboardManager({ kind, section }: Props) {
+  const toast = useToast();
   const [data, setData] = useState<JsonRecord[]>([]);
   const [single, setSingle] = useState<JsonRecord | null>(null);
+  const [related, setRelated] = useState<JsonRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [refresh, setRefresh] = useState(0);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<JsonRecord | null>(null);
-  const [message, setMessage] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -40,16 +42,17 @@ export function DashboardManager({ kind, section }: Props) {
       programmes: "/api/admin/programmes",
       applications: "/api/admin/applications",
       students: "/api/admin/students",
-      payments: "/api/admin/payments",
       announcements: "/api/admin/announcements",
       schedule: "/api/admin/schedule",
       settings: "/api/admin/settings",
+      gallery: "/api/admin/gallery",
+      certificates: "/api/admin/certificates",
       dashboard: "/api/admin/dashboard",
       reports: "/api/admin/dashboard",
     } : {
       overview: "/api/student/overview",
       applications: "/api/student/applications",
-      payments: "/api/student/payments",
+      certificates: "/api/student/certificates",
       profile: "/api/student/profile",
       schedule: "/api/student/schedule",
       notifications: "/api/student/notifications",
@@ -58,7 +61,7 @@ export function DashboardManager({ kind, section }: Props) {
     const path = endpoints[section];
     if (!path) { setLoading(false); return; }
     setLoading(true); setError("");
-    requestJson<{ data?: unknown; email?: string; stats?: JsonRecord; recent?: JsonRecord[]; applications?: JsonRecord[]; payments?: JsonRecord[]; unread?: number }>(path)
+    requestJson<{ data?: unknown; students?: JsonRecord[]; email?: string; stats?: JsonRecord; recent?: JsonRecord[]; applications?: JsonRecord[]; unread?: number }>(path)
       .then((result) => {
         if (!active) return;
         if (section === "profile") setSingle(isRecord(result.data) ? { ...result.data, email: result.email } : null);
@@ -66,8 +69,11 @@ export function DashboardManager({ kind, section }: Props) {
         else if (section === "dashboard" || section === "reports") setData((result.recent ?? []) as JsonRecord[]);
         else if (section === "overview") {
           setData(result.applications ?? []);
-          setSingle({ stats: result.stats, unread: result.unread, payments: result.payments, applications: result.applications });
-        } else setData(Array.isArray(result.data) ? result.data.filter(isRecord) : []);
+          setSingle({ stats: result.stats, unread: result.unread, applications: result.applications });
+        } else {
+          setData(Array.isArray(result.data) ? result.data.filter(isRecord) : []);
+          if (section === "certificates") setRelated(result.students ?? []);
+        }
       })
       .catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : "Could not load dashboard data."); })
       .finally(() => { if (active) setLoading(false); });
@@ -75,14 +81,14 @@ export function DashboardManager({ kind, section }: Props) {
   }, [kind, section, refresh]);
 
   async function mutate(url: string, method: "POST" | "PATCH" | "DELETE", body?: JsonRecord) {
-    setSaving(true); setError(""); setMessage("");
+    setSaving(true); setError("");
     try {
       await requestJson(url, { method, ...(body ? { body: JSON.stringify(body) } : {}) });
-      setMessage("Changes saved.");
+      toast({ kind: "success", title: "Changes saved" });
       setEditing(null);
       setRefresh((value) => value + 1);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not save changes.");
+      toast({ kind: "error", title: "Could not save changes", description: reason instanceof Error ? reason.message : "Please try again." });
     } finally {
       setSaving(false);
     }
@@ -91,18 +97,18 @@ export function DashboardManager({ kind, section }: Props) {
   if (loading) return <p className="muted" role="status">Loading records…</p>;
   return <div className="dashboard-manager">
     {error && <Notice title="Action could not be completed">{error}</Notice>}
-    {message && <p className="success-message" role="status"><Check size={16} />{message}</p>}
     {kind === "admin" && section === "programmes" && <ProgrammeManager programmes={data as unknown as Programme[]} editing={editing} setEditing={setEditing} saving={saving} onSave={(body, id) => mutate(`/api/admin/programmes${id ? `/${id}` : ""}`, id ? "PATCH" : "POST", body)} onUnpublish={(id) => void mutate(`/api/admin/programmes/${id}`, "DELETE")} />}
     {kind === "admin" && section === "applications" && <ApplicationsManager records={data} saving={saving} onDecision={(id, status, expectedUpdatedAt) => void mutate(`/api/admin/applications/${id}`, "PATCH", { status, expectedUpdatedAt })} />}
     {kind === "admin" && section === "students" && <StudentsManager records={data} />}
-    {kind === "admin" && section === "payments" && <PaymentsManager records={data} />}
+    {kind === "admin" && section === "gallery" && <GalleryManager records={data} onRefresh={() => setRefresh((value) => value + 1)} />}
+    {kind === "admin" && section === "certificates" && <CertificatesManager records={data} students={related} onRefresh={() => setRefresh((value) => value + 1)} />}
     {kind === "admin" && section === "announcements" && <AnnouncementsManager records={data} saving={saving} onSave={(body) => void mutate("/api/admin/announcements", "POST", body)} onUpdate={(id, body) => void mutate(`/api/admin/announcements/${id}`, "PATCH", body)} onDelete={(id) => void mutate(`/api/admin/announcements/${id}`, "DELETE")} />}
     {kind === "admin" && section === "schedule" && <ScheduleManager records={data} saving={saving} onError={setError} onSave={(body) => void mutate("/api/admin/schedule", "POST", body)} onDelete={(id) => void mutate(`/api/admin/schedule/${id}`, "DELETE")} />}
     {kind === "admin" && section === "settings" && <SettingsManager value={single} saving={saving} onSave={(body) => void mutate("/api/admin/settings/organization", "PATCH", body)} />}
     {kind === "admin" && (section === "dashboard" || section === "reports") && <AdminSummary section={section} records={data} onRefresh={() => setRefresh((value) => value + 1)} />}
     {kind === "student" && section === "overview" && <StudentOverview value={single} />}
     {kind === "student" && section === "applications" && <StudentApplications records={data} />}
-    {kind === "student" && section === "payments" && <StudentPayments records={data} />}
+    {kind === "student" && section === "certificates" && <StudentCertificates records={data} />}
     {kind === "student" && section === "profile" && <ProfileManager value={single} saving={saving} onSave={(body) => void mutate("/api/student/profile", "PATCH", body)} />}
     {kind === "student" && section === "schedule" && <StudentSchedule records={data} />}
     {kind === "student" && (section === "notifications" || section === "announcements") && <StudentMessages records={data} section={section} onRead={(id, read) => void mutate(`/api/student/notifications/${id}`, "PATCH", { read })} />}
@@ -113,7 +119,7 @@ function ProgrammeManager({ programmes, editing, setEditing, saving, onSave, onU
   programmes: Programme[]; editing: JsonRecord | null; setEditing: (value: JsonRecord | null) => void; saving: boolean; onSave: (body: JsonRecord, id?: string) => Promise<void>; onUnpublish: (id: string) => void;
 }) {
   return <>
-    <div className="manager-heading"><p>List drafts as “Coming soon”; approve fees before opening enrollment.</p><button className="button button-primary" onClick={() => setEditing({})}><Plus size={16} /> Add programme</button></div>
+    <div className="manager-heading"><p>Publish a programme when its training information is ready for applications.</p><button className="button button-primary" onClick={() => setEditing({})}><Plus size={16} /> Add programme</button></div>
     {editing !== null && <ProgrammeForm value={editing} saving={saving} onCancel={() => setEditing(null)} onSave={(body) => onSave(body, typeof editing.id === "string" ? editing.id : undefined)} />}
     {programmes.length ? <div className="programme-admin-grid">{programmes.map((p) => {
       const imageUrl = getProgrammeImageUrl(p.image_path);
@@ -122,11 +128,11 @@ function ProgrammeManager({ programmes, editing, setEditing, saving, onSave, onU
         <div className="programme-admin-body">
           <div className="programme-admin-heading"><div><span className="tag">{p.category}</span><h2>{p.name}</h2></div><span className={`status-tag ${p.is_published ? "status-published" : "status-draft"}`}>{p.is_published ? "Published" : "Draft"}</span></div>
           <p className="muted">{p.summary || "Programme description not added yet."}</p>
-          <div className="programme-admin-meta"><span>{p.duration || "Duration not set"}</span><strong>{p.price_minor == null ? "Fee not set" : new Intl.NumberFormat(undefined, { style: "currency", currency: p.currency }).format(p.price_minor / 100)}</strong></div>
+          <div className="programme-admin-meta"><span>{p.duration || "Duration not set"}</span></div>
           <div className="programme-admin-footer"><span>{p.is_listed ? "Visible in catalogue" : "Hidden from catalogue"}</span><div className="table-actions"><button className="button button-outline button-small" onClick={() => setEditing({ ...p, curriculum: p.curriculum.join("\n"), outcomes: p.outcomes.join("\n") })}><Pencil size={14} /> Edit</button>{p.is_published && <button className="button button-outline button-small" onClick={() => onUnpublish(p.id)}>Unpublish</button>}</div></div>
         </div>
       </article>;
-    })}</div> : <EmptyState title="No programme records">Use “Add programme” to create a draft course record. Confirm commercial terms before approving its price.</EmptyState>}
+    })}</div> : <EmptyState title="No programme records">Use “Add programme” to create a draft course record.</EmptyState>}
   </>;
 }
 
@@ -136,11 +142,10 @@ function ProgrammeForm({ value, saving, onCancel, onSave }: { value: JsonRecord;
   const [uploadError, setUploadError] = useState("");
   const [form, setForm] = useState({
     name: String(value.name ?? ""), slug: String(value.slug ?? ""), category: String(value.category ?? ""), summary: String(value.summary ?? ""),
-    duration: String(value.duration ?? ""), price_minor: value.price_minor == null ? "" : String(Number(value.price_minor) / 100),
-    currency: String(value.currency ?? "NGN"), entry_requirements: String(value.entry_requirements ?? ""),
+    duration: String(value.duration ?? ""), entry_requirements: String(value.entry_requirements ?? ""),
     curriculum: Array.isArray(value.curriculum) ? value.curriculum.join("\n") : String(value.curriculum ?? ""),
     outcomes: Array.isArray(value.outcomes) ? value.outcomes.join("\n") : String(value.outcomes ?? ""),
-    price_approved: value.price_approved === true, is_published: value.is_published === true,
+    is_published: value.is_published === true,
     is_listed: value.is_listed !== false,
     image_path: typeof value.image_path === "string" ? value.image_path : "",
   });
@@ -154,7 +159,6 @@ function ProgrammeForm({ value, saving, onCancel, onSave }: { value: JsonRecord;
   function update(key: string, val: string | boolean) { setForm((current) => ({ ...current, [key]: val })); }
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const cents = form.price_minor === "" ? null : Math.round(Number(form.price_minor) * 100);
     setUploadError("");
     setUploading(true);
     try {
@@ -167,7 +171,7 @@ function ProgrammeForm({ value, saving, onCancel, onSave }: { value: JsonRecord;
         if (!response.ok || !result.path) throw new Error(result.error || "Could not upload programme image.");
         imagePath = result.path;
       }
-      await onSave({ ...form, image_path: imagePath, price_minor: cents, curriculum: form.curriculum.split("\n").map((s) => s.trim()).filter(Boolean), outcomes: form.outcomes.split("\n").map((s) => s.trim()).filter(Boolean), is_published: form.is_published && form.price_approved && cents !== null });
+      await onSave({ ...form, image_path: imagePath, curriculum: form.curriculum.split("\n").map((s) => s.trim()).filter(Boolean), outcomes: form.outcomes.split("\n").map((s) => s.trim()).filter(Boolean) });
     } catch (reason) {
       setUploadError(reason instanceof Error ? reason.message : "Could not save programme.");
     } finally {
@@ -187,11 +191,9 @@ function ProgrammeForm({ value, saving, onCancel, onSave }: { value: JsonRecord;
     <div className="form-row"><Field label="Programme name" value={form.name} onChange={(v) => update("name", v)} required /><Field label="URL slug" value={form.slug} onChange={(v) => update("slug", v.toLowerCase().replace(/[^a-z0-9-]+/g, "-"))} required /></div>
     <div className="form-row"><Field label="Category" value={form.category} onChange={(v) => update("category", v)} required /><Field label="Duration" value={form.duration} onChange={(v) => update("duration", v)} /></div>
     <Field label="Summary" value={form.summary} onChange={(v) => update("summary", v)} area />
-    <div className="form-row"><Field label="Price (major currency units)" value={form.price_minor} onChange={(v) => update("price_minor", v)} type="number" min="0" step="0.01" /><Field label="Currency code" value={form.currency} onChange={(v) => update("currency", v.toUpperCase())} /></div>
     <Field label="Entry requirements" value={form.entry_requirements} onChange={(v) => update("entry_requirements", v)} />
     <div className="form-row"><Field label="Curriculum (one item per line)" value={form.curriculum} onChange={(v) => update("curriculum", v)} area /><Field label="Learning outcomes (one per line)" value={form.outcomes} onChange={(v) => update("outcomes", v)} area /></div>
-    <label className="check-field"><input type="checkbox" checked={form.price_approved} onChange={(e) => update("price_approved", e.target.checked)} /> Commercial price approved by Tamark</label>
-    <label className="check-field"><input type="checkbox" checked={form.is_published} disabled={!form.price_approved || form.price_minor === ""} onChange={(e) => update("is_published", e.target.checked)} /> Publish this programme</label>
+    <label className="check-field"><input type="checkbox" checked={form.is_published} onChange={(e) => update("is_published", e.target.checked)} /> Publish this programme</label>
     <label className="check-field"><input type="checkbox" checked={form.is_listed} onChange={(e) => update("is_listed", e.target.checked)} /> Show in public catalogue (drafts appear as “Coming soon”)</label>
     <div className="wizard-actions"><button className="button button-outline" type="button" onClick={onCancel}>Cancel</button><button className="button button-primary" disabled={saving || uploading}>{uploading ? "Uploading image…" : saving ? "Saving…" : "Save programme"}</button></div>
   </form>;
@@ -205,7 +207,7 @@ function ApplicationsManager({ records, saving, onDecision }: { records: JsonRec
     {list.length ? <div className="application-admin-grid">{list.map((row) => {
       const profile = row.profiles as JsonRecord | null;
       const personal = row.personal_details as JsonRecord | null;
-      const name = profile?.full_name || [personal?.firstName, personal?.lastName].filter(Boolean).join(" ") || "Student";
+      const name = profile?.full_name || [personal?.firstName, personal?.lastName].filter(Boolean).join(" ") || "Applicant";
       const programme = row.programmes as JsonRecord | null;
       const contact = row.contact_details as JsonRecord | null;
       const education = row.education_details as JsonRecord | null;
@@ -242,66 +244,6 @@ function StudentsManager({ records }: { records: JsonRecord[] }) {
       <div className="student-admin-card-footer"><span><BookOpen size={14} />{applicationCount} {applicationCount === 1 ? "application" : "applications"}</span><span>Joined {date(row.created_at)}</span></div>
     </article>;
   })}</div> : <EmptyState title="No student records">Student accounts will appear here after registration.</EmptyState>;
-}
-
-function PaymentsManager({ records }: { records: JsonRecord[] }) {
-  return records.length ? <div className="payment-admin-grid">{records.map((row) => {
-    const profile = row.profiles as JsonRecord | null;
-    const app = row.applications as JsonRecord | null;
-    const programme = app?.programmes as JsonRecord | null;
-    return <article className="payment-admin-card" key={String(row.id)}>
-      <div className="payment-admin-card-top"><span className="payment-admin-icon"><CreditCard size={18} /></span><span className={`status-tag student-status ${String(row.status)}`}>{String(row.status)}</span></div>
-      <strong className="payment-admin-amount">{money(Number(row.amount_minor), String(row.currency))}</strong>
-      <span className="payment-admin-programme">{String(programme?.name ?? "Training programme")}</span>
-      <div className="payment-admin-details"><span><UserRound size={14} />{String(profile?.full_name ?? "Student")}</span><span><Clock3 size={14} />{date(row.verified_at ?? row.created_at, true)}</span></div>
-      <div className="payment-reference"><span>Reference</span><code>{String(row.provider_reference)}</code></div>
-      {row.status === "successful" && <RefundAction paymentId={String(row.id)} amountMinor={Number(row.amount_minor)} currency={String(row.currency)} />}
-    </article>;
-  })}</div> : <EmptyState title="No payment records">Payment transactions will appear after checkout starts.</EmptyState>;
-}
-
-function RefundAction({ paymentId, amountMinor, currency }: { paymentId: string; amountMinor: number; currency: string }) {
-  const [open, setOpen] = useState(false);
-  const [reason, setReason] = useState("");
-  const [confirmed, setConfirmed] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState("");
-  const [error, setError] = useState("");
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!confirmed) {
-      setError("Confirm that you want to refund the full payment.");
-      return;
-    }
-    setBusy(true);
-    setError("");
-    try {
-      const result = await requestJson<{ status: string }>("/api/admin/finance/refunds", {
-        method: "POST",
-        body: JSON.stringify({ paymentId, reason, confirm: confirmed }),
-      });
-      setStatus(result.status);
-      setOpen(false);
-    } catch (reasonValue) {
-      setError(reasonValue instanceof Error ? reasonValue.message : "Could not request the refund.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  if (status) return <p className="payment-verification-note" role="status">Refund status: {status}. Check provider reconciliation before taking further action.</p>;
-  if (!open) return <button className="button button-outline button-small" type="button" onClick={() => setOpen(true)}>Request full refund</button>;
-  return <form className="manager-form refund-request-form" onSubmit={(event) => void submit(event)}>
-    <p className="muted">Full refund: {money(amountMinor, currency)}. This action contacts Paystack and cannot be undone.</p>
-    <label className="field">Refund reason<textarea value={reason} onChange={(event) => setReason(event.target.value)} minLength={3} maxLength={1000} required /></label>
-    <label className="check-field"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} /> I confirm this full refund.</label>
-    {error && <p className="wizard-error" role="alert">{error}</p>}
-    <div className="table-actions">
-      <button className="button button-outline button-small" type="button" disabled={busy} onClick={() => setOpen(false)}>Cancel</button>
-      <button className="button button-primary button-small" type="submit" disabled={busy || !confirmed}>{busy ? "Requesting…" : "Confirm refund"}</button>
-    </div>
-  </form>;
 }
 
 function AnnouncementsManager({ records, saving, onSave, onUpdate, onDelete }: { records: JsonRecord[]; saving: boolean; onSave: (body: JsonRecord) => void; onUpdate: (id: string, body: JsonRecord) => void; onDelete: (id: string) => void }) {
@@ -354,10 +296,12 @@ function SettingsManager({ value, saving, onSave }: { value: JsonRecord | null; 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  useEffect(() => { setName(String(value?.organization_name ?? "")); setEmail(String(value?.contact_email ?? "")); setPhone(String(value?.contact_phone ?? "")); }, [value]);
-  return <form className="form-card manager-form settings-form" onSubmit={(event) => { event.preventDefault(); onSave({ organization_name: name, contact_email: email, contact_phone: phone }); }}>
+  const [whatsappPhone, setWhatsappPhone] = useState("");
+  useEffect(() => { setName(String(value?.organization_name ?? "")); setEmail(String(value?.contact_email ?? "")); setPhone(String(value?.contact_phone ?? "")); setWhatsappPhone(String(value?.whatsapp_phone || "+234")); }, [value]);
+  return <form className="form-card manager-form settings-form" onSubmit={(event) => { event.preventDefault(); onSave({ organization_name: name, contact_email: email, contact_phone: phone, whatsapp_phone: whatsappPhone }); }}>
     <div className="composer-heading"><span className="composer-icon"><UserRound size={19} /></span><div><h2>Organization information</h2><p>Only enter contact information approved for publication.</p></div></div>
     <Field label="Organization name" value={name} onChange={setName} required /><Field label="Public contact email" type="email" value={email} onChange={setEmail} /><Field label="Public contact phone" type="tel" value={phone} onChange={setPhone} />
+    <div><Field label="WhatsApp applications number" type="tel" value={whatsappPhone} onChange={setWhatsappPhone} /><small className="settings-help">Nigeria’s +234 country code is prefilled. Enter the remaining digits without the leading 0, or replace it with another country code.</small></div>
     <button className="button button-primary" disabled={saving}>{saving ? "Saving…" : "Save settings"}</button>
   </form>;
 }
@@ -365,9 +309,6 @@ function SettingsManager({ value, saving, onSave }: { value: JsonRecord | null; 
 function AdminSummary({ section, records, onRefresh }: { section: string; records: JsonRecord[]; onRefresh: () => void }) {
   const [stats, setStats] = useState<JsonRecord | null>(null);
   const [summaryError, setSummaryError] = useState("");
-  const [reconciliation, setReconciliation] = useState<JsonRecord | null>(null);
-  const [reconciliationError, setReconciliationError] = useState("");
-  const [reconciling, setReconciling] = useState(false);
   useEffect(() => {
     let active = true;
     requestJson<{ stats: JsonRecord }>("/api/admin/dashboard")
@@ -376,42 +317,15 @@ function AdminSummary({ section, records, onRefresh }: { section: string; record
     return () => { active = false; };
   }, [records]);
   if (summaryError) return <Notice title="Could not load dashboard data">{summaryError}</Notice>;
-  if (!stats) return <EmptyState title="No live dashboard data">Add approved programmes and connect student activity to populate this dashboard.</EmptyState>;
-  const revenue = (stats.revenueByCurrency ?? {}) as Record<string, number>;
-  async function runReconciliation() {
-    setReconciling(true);
-    setReconciliationError("");
-    try {
-      setReconciliation(await requestJson<JsonRecord>("/api/admin/finance/reconciliation"));
-    } catch (reason) {
-      setReconciliationError(reason instanceof Error ? reason.message : "Could not run reconciliation.");
-    } finally {
-      setReconciling(false);
-    }
-  }
+  if (!stats) return <EmptyState title="No live dashboard data">Publish training programmes and connect student activity to populate this dashboard.</EmptyState>;
   return <>
-    <div className="manager-heading"><p>{section === "reports" ? "Current totals from database records." : "Live operational summary."}</p><button className="button button-outline button-small" onClick={onRefresh}><RefreshCw size={14} /> Refresh</button></div>
+    <div className="manager-heading"><p>{section === "reports" ? "Current student and application totals." : "Live operational summary."}</p><button className="button button-outline button-small" onClick={onRefresh}><RefreshCw size={14} /> Refresh</button></div>
     <div className="stats">{([
       ["Students", stats.students], ["Applications", stats.applications], ["Awaiting review", stats.pending],
-      ["Successful payments", stats.verifiedPayments],
     ] as [string, unknown][]).map(([label, amount]) => <div className="card stat" key={label}>{label}<b>{Number(amount ?? 0).toLocaleString()}</b></div>)}</div>
-    <>
-      <h2 className="subheading">Successful payments by currency</h2>
-      {Object.keys(revenue).length ? <div className="summary-strip">{Object.entries(revenue).map(([currency, minor]) => <div key={currency}><span>{currency}</span><strong>{money(Number(minor), currency)}</strong></div>)}</div> : <p className="muted">No successful payments recorded.</p>}
-    </>
     {section === "reports" && <div className="table-actions">
       <button className="button button-outline" onClick={() => window.location.assign("/api/admin/reports")}>Download current report (CSV) <Download size={15} /></button>
-      <button className="button button-outline" type="button" onClick={() => void runReconciliation()} disabled={reconciling}>{reconciling ? "Reconciling…" : "Run reconciliation"} <RefreshCw size={15} /></button>
     </div>}
-    {reconciliationError && <p className="wizard-error" role="alert">{reconciliationError}</p>}
-    {reconciliation && <section className="student-panel" aria-live="polite">
-      <h2>Payment reconciliation</h2>
-      <p className="muted">Compared {String(reconciliation.internalRecords ?? 0)} internal and {String(reconciliation.providerRecords ?? 0)} provider records. No records were changed automatically.</p>
-      {Array.isArray(reconciliation.discrepancies) && reconciliation.discrepancies.length
-        ? <ul>{(reconciliation.discrepancies as JsonRecord[]).map((item, index) => <li key={`${String(item.type)}-${index}`}>{String(item.type).replaceAll("_", " ")} · {String(item.reference)}</li>)}</ul>
-        : <p>No payment discrepancies were found for the default date range.</p>}
-      <p className="muted">Pending refunds require manual provider review.</p>
-    </section>}
     <div className="summary-section-heading"><div><h2 className="subheading">Recent applications</h2><p>Latest activity across the student portal.</p></div><span>{records.length} recent</span></div>
     {records.length ? <div className="summary-app-grid">{records.map((row) => {
       const personal = row.personal_details as JsonRecord | null;
@@ -421,22 +335,206 @@ function AdminSummary({ section, records, onRefresh }: { section: string; record
         <div className="summary-app-top"><span className="admin-avatar"><UserRound size={17} /></span><span className={`status-tag student-status ${String(row.status)}`}>{String(row.status).replaceAll("_", " ")}</span></div>
         <strong>{name}</strong><span className="summary-app-programme"><BookOpen size={14} />{String(programme?.name ?? "Training programme")}</span><small>{date(row.created_at, true)}</small>
       </article>;
-    })}</div> : <EmptyState title="No applications yet">Applications will appear here after submission and payment verification.</EmptyState>}
+    })}</div> : <EmptyState title="No applications yet">Applications will appear here after students submit their details.</EmptyState>}
   </>;
+}
+
+function GalleryManager({ records, onRefresh }: { records: JsonRecord[]; onRefresh: () => void }) {
+  const toast = useToast();
+  const [image, setImage] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!image) {
+      setPreviewUrl("");
+      return;
+    }
+    const url = URL.createObjectURL(image);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [image]);
+
+  async function upload(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!image) {
+      toast({ kind: "error", title: "Choose an image", description: "Select a JPG, PNG, or WebP image to upload." });
+      return;
+    }
+    setBusy(true);
+    try {
+      const form = new FormData();
+      const title = image.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim() || "Gallery photo";
+      form.set("title", title.slice(0, 160));
+      form.set("description", "");
+      form.set("sort_order", "0");
+      form.set("is_published", "true");
+      form.set("image", image);
+      const response = await fetch("/api/admin/gallery", { method: "POST", body: form });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error || "Could not upload gallery image.");
+      setImage(null);
+      onRefresh();
+      toast({ kind: "success", title: "Image uploaded", description: "The image is now available in the gallery." });
+    } catch (reason) {
+      toast({ kind: "error", title: "Image upload failed", description: reason instanceof Error ? reason.message : "Please try again." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <>
+    <form className="form-card manager-form gallery-upload-form" onSubmit={(event) => void upload(event)}>
+      <label className="gallery-upload-box">
+        <input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Choose gallery image" onChange={(event) => {
+          const file = event.target.files?.[0] ?? null;
+          if (file && !["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+            event.currentTarget.value = "";
+            setImage(null);
+            toast({ kind: "error", title: "Unsupported image format", description: "Choose a JPG, PNG, or WebP image." });
+            return;
+          }
+          if (file && file.size > 5 * 1024 * 1024) {
+            event.currentTarget.value = "";
+            setImage(null);
+            toast({ kind: "error", title: "Image is too large", description: "Choose an image no larger than 5 MB." });
+            return;
+          }
+          setImage(file);
+        }} />
+        {previewUrl ? <span className="gallery-upload-preview" role="img" aria-label="Selected gallery image preview" style={{ backgroundImage: `url("${previewUrl}")` }} /> : <span className="gallery-upload-empty"><ImagePlus size={28} /><strong>Select an image</strong></span>}
+        <span className="gallery-upload-overlay">{image ? "Choose a different image" : "Choose image"}</span>
+      </label>
+      <p className="gallery-upload-help">JPG, PNG or WebP · Up to 5 MB · Uploaded images appear on the public homepage.</p>
+      {image && <p className="gallery-upload-filename">{image.name}</p>}
+      <button className="button button-primary" disabled={busy || !image}>{busy ? "Uploading…" : "Upload image"}</button>
+    </form>
+    {records.length ? <div className="gallery-admin-list" role="list">{records.map((item) => <GalleryItemEditor key={String(item.id)} item={item} onRefresh={onRefresh} />)}</div> : <EmptyState title="No gallery photos">Upload an approved photo to publish it on the website.</EmptyState>}
+  </>;
+}
+
+function GalleryItemEditor({ item, onRefresh }: { item: JsonRecord; onRefresh: () => void }) {
+  const toast = useToast();
+  const [title, setTitle] = useState(String(item.title ?? ""));
+  const [description, setDescription] = useState(String(item.description ?? ""));
+  const [sortOrder, setSortOrder] = useState(String(item.sort_order ?? 0));
+  const [published, setPublished] = useState(item.is_published === true);
+  const [busy, setBusy] = useState(false);
+
+  async function update(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      await requestJson(`/api/admin/gallery/${encodeURIComponent(String(item.id))}`, {
+        method: "PATCH",
+        body: JSON.stringify({ title, description, sort_order: Number(sortOrder), is_published: published }),
+      });
+      onRefresh();
+      toast({ kind: "success", title: "Photo updated" });
+    } catch (reason) {
+      toast({ kind: "error", title: "Could not update photo", description: reason instanceof Error ? reason.message : "Please try again." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove() {
+    if (!window.confirm("Delete this gallery photo? This also removes the image file.")) return;
+    setBusy(true);
+    try {
+      await requestJson(`/api/admin/gallery/${encodeURIComponent(String(item.id))}`, { method: "DELETE" });
+      onRefresh();
+      toast({ kind: "success", title: "Photo deleted" });
+    } catch (reason) {
+      toast({ kind: "error", title: "Could not delete photo", description: reason instanceof Error ? reason.message : "Please try again." });
+      onRefresh();
+      setBusy(false);
+    }
+  }
+  return <form className="form-card manager-form gallery-admin-card" role="listitem" onSubmit={(event) => void update(event)}>
+    {typeof item.image_url === "string" && <div className="gallery-admin-image" role="img" aria-label={title} style={{ backgroundImage: `url("${item.image_url}")` }} />}
+    <Field label="Image title and alt text" value={title} onChange={setTitle} required />
+    <Field label="Caption" value={description} onChange={setDescription} area />
+    <Field label="Display order" value={sortOrder} onChange={setSortOrder} type="number" min="0" />
+    <label className="check-field"><input type="checkbox" checked={published} onChange={(event) => setPublished(event.target.checked)} /> Published</label>
+    <div className="wizard-actions"><button className="button button-primary button-small" disabled={busy}>{busy ? "Saving…" : "Save photo"}</button><button className="button button-outline button-small danger-button" type="button" disabled={busy} onClick={() => void remove()}><Trash2 size={14} /> Delete</button></div>
+  </form>;
+}
+
+function CertificatesManager({ records, students, onRefresh }: { records: JsonRecord[]; students: JsonRecord[]; onRefresh: () => void }) {
+  const toast = useToast();
+  const [studentId, setStudentId] = useState("");
+  const [title, setTitle] = useState("Certificate of Completion");
+  const [programmeName, setProgrammeName] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function issue(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!file) {
+      toast({ kind: "error", title: "Choose a certificate", description: "Select the student's PDF certificate before issuing it." });
+      return;
+    }
+    setBusy(true);
+    try {
+      const form = new FormData();
+      form.set("student_id", studentId);
+      form.set("title", title);
+      form.set("programme_name", programmeName);
+      form.set("certificate", file);
+      const response = await fetch("/api/admin/certificates", { method: "POST", body: form });
+      const result = await response.json() as { error?: string; warnings?: string[] };
+      if (!response.ok) throw new Error(result.error || "Could not issue certificate.");
+      toast(result.warnings?.length
+        ? { kind: "info", title: "Certificate issued", description: result.warnings.join(" ") }
+        : { kind: "success", title: "Certificate issued", description: "The student has been notified." });
+      setFile(null);
+      onRefresh();
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : "Please try again.";
+      toast({ kind: "error", title: "Could not issue certificate", description: message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <>
+    <form className="form-card manager-form" onSubmit={(event) => void issue(event)}>
+      <div className="composer-heading"><span className="composer-icon"><Award size={19} /></span><div><h2>Send a certificate</h2><p>Upload an individual PDF. It is stored privately and only that student can download it.</p></div></div>
+      <label className="field">Student<select value={studentId} onChange={(event) => setStudentId(event.target.value)} required><option value="">Select a student</option>{students.map((student) => <option value={String(student.id)} key={String(student.id)}>{String(student.full_name || student.email || "Student")} · {String(student.email ?? "no email")}</option>)}</select></label>
+      <Field label="Certificate title" value={title} onChange={setTitle} required />
+      <Field label="Programme name (optional)" value={programmeName} onChange={setProgrammeName} />
+      <label className="field">Certificate PDF<input type="file" accept="application/pdf,.pdf" onChange={(event) => setFile(event.target.files?.[0] ?? null)} required /></label>
+      <small>PDF only · maximum 10 MB</small>
+      <button className="button button-primary" disabled={busy || students.length === 0}>{busy ? "Issuing…" : "Issue certificate"}</button>
+    </form>
+    {records.length ? <div className="student-record-grid">{records.map((record) => {
+      const student = record.profiles as JsonRecord | null;
+      return <article className="student-record-card" key={String(record.id)}><div className="student-record-card-top"><span className="student-stat-icon emerald"><Award size={18} /></span><span className="tag">{date(record.created_at)}</span></div><h2>{String(record.title)}</h2><p>{String(student?.full_name || student?.email || "Student")}</p>{Boolean(record.programme_name) && <p className="muted">{String(record.programme_name)}</p>}</article>;
+    })}</div> : <EmptyState title="No certificates issued">Certificates sent to students will appear here.</EmptyState>}
+  </>;
+}
+
+function StudentCertificates({ records }: { records: JsonRecord[] }) {
+  return records.length ? <div className="student-record-grid">{records.map((certificate) => <article className="student-record-card" key={String(certificate.id)}>
+    <div className="student-record-card-top"><span className="student-stat-icon emerald"><Award size={18} /></span><span className="tag">{date(certificate.created_at)}</span></div>
+    <h2>{String(certificate.title)}</h2>
+    {Boolean(certificate.programme_name) && <p className="muted">{String(certificate.programme_name)}</p>}
+    <a className="button button-primary button-small" href={`/api/student/certificates/${encodeURIComponent(String(certificate.id))}`}><Download size={15} /> Download certificate</a>
+  </article>)}</div> : <EmptyState title="No certificates yet">Certificates issued by Tamark will appear here.</EmptyState>;
 }
 
 function StudentOverview({ value }: { value: JsonRecord | null }) {
   const stats = value?.stats as JsonRecord | undefined;
   const apps = (value?.applications ?? []) as JsonRecord[];
-  const payments = (value?.payments ?? []) as JsonRecord[];
   return <>
     <div className="student-dashboard-heading">
-      <div><span className="eyebrow">YOUR LEARNING JOURNEY</span><h2>Welcome to your portal</h2><p>Keep track of your applications, payments, and training updates.</p></div>
+      <div><span className="eyebrow">YOUR LEARNING JOURNEY</span><h2>Welcome to your portal</h2><p>Keep track of your applications, certificates, and training updates.</p></div>
       <Link className="button button-primary" href="/training">Explore programmes <ArrowRight size={16} /></Link>
     </div>
     <div className="stats student-stat-grid">
       <article className="student-stat-card"><span className="student-stat-icon emerald"><BookOpen size={19} /></span><div><span>Applications</span><strong>{Number(stats?.applications ?? apps.length)}</strong></div><Link href="/student/applications" aria-label="View applications"><ArrowRight size={17} /></Link></article>
-      <article className="student-stat-card"><span className="student-stat-icon gold"><CreditCard size={19} /></span><div><span>Verified payments</span><strong>{Number(stats?.verifiedPayments ?? 0)}</strong></div><Link href="/student/payments" aria-label="View payments"><ArrowRight size={17} /></Link></article>
+      <article className="student-stat-card"><span className="student-stat-icon gold"><Award size={19} /></span><div><span>Certificates</span><strong>{Number(stats?.certificates ?? 0)}</strong></div><Link href="/student/certificates" aria-label="View certificates"><ArrowRight size={17} /></Link></article>
       <article className="student-stat-card"><span className="student-stat-icon mint"><Bell size={19} /></span><div><span>Unread notifications</span><strong>{Number(value?.unread ?? 0)}</strong></div><Link href="/student/notifications" aria-label="View notifications"><ArrowRight size={17} /></Link></article>
     </div>
     <div className="student-overview-grid">
@@ -453,11 +551,8 @@ function StudentOverview({ value }: { value: JsonRecord | null }) {
         })}</div> : <EmptyState title="No applications yet">Browse programmes and start your application when enrollment opens.</EmptyState>}
       </section>
       <section className="student-panel student-activity-panel">
-        <div className="student-panel-heading"><div><h2>Latest payment</h2><p>Your verified transactions</p></div><CreditCard size={19} /></div>
-        {payments.length ? payments.slice(0, 2).map((payment) => <div className="student-payment-card" key={String(payment.id)}>
-          <span className="student-payment-icon"><CreditCard size={17} /></span><div><strong>{money(Number(payment.amount_minor), String(payment.currency))}</strong><span>{date(payment.created_at, true)}</span></div><span className={`status-tag student-status ${String(payment.status)}`}>{String(payment.status)}</span>
-        </div>) : <div className="student-empty-note"><Clock3 size={19} /><p>No payments to show yet.</p></div>}
-        <Link className="student-panel-link" href="/student/payments">Payment history <ArrowRight size={15} /></Link>
+        <div className="student-panel-heading"><div><h2>Certificates</h2><p>Download certificates issued by Tamark.</p></div><Award size={19} /></div>
+        <Link className="student-panel-link" href="/student/certificates">View certificates <ArrowRight size={15} /></Link>
       </section>
     </div>
   </>;
@@ -467,27 +562,13 @@ function StudentApplications({ records }: { records: JsonRecord[] }) {
   return records.length ? <div className="student-record-grid">{records.map((row) => {
     const programme = row.programmes as JsonRecord | null;
     const status = String(row.status ?? "pending");
-    const payments = (row.payments as JsonRecord[] | null) ?? [];
-    const paid = payments.some((payment) => payment.status === "successful" || payment.status === "partially_refunded");
     return <article className="student-record-card" key={String(row.id)}>
       <div className="student-record-card-top"><span className="student-stat-icon emerald"><BookOpen size={18} /></span><span className={`status-tag student-status ${status}`}>{status.replaceAll("_", " ")}</span></div>
       <h2>{String(programme?.name ?? "Training programme")}</h2>
       <p className="student-record-meta"><CalendarDays size={14} />Started {date(row.created_at)}</p>
-      <div className="student-record-footer"><span>Added {date(row.created_at)}</span>{status === "draft" && paid ? <ApplicationSubmitAction applicationId={String(row.id)} /> : status === "draft" ? <Link className="button button-primary button-small" href={`/checkout/${row.id}`}>Continue checkout <ArrowRight size={14} /></Link> : <span className="student-record-id">{String(row.application_reference ?? "Application")}</span>}</div>
+      <div className="student-record-footer"><span>Added {date(row.created_at)}</span>{status === "draft" ? <Link className="button button-primary button-small" href="/apply">Continue application <ArrowRight size={14} /></Link> : <span className="student-record-id">{String(row.application_reference ?? "Application")}</span>}</div>
     </article>;
   })}</div> : <EmptyState title="No applications yet">Your submitted applications will appear here.</EmptyState>;
-}
-
-function StudentPayments({ records }: { records: JsonRecord[] }) {
-  return records.length ? <div className="student-record-grid payment-record-grid">{records.map((row) => {
-    const verified = row.status === "successful";
-    return <article className="student-record-card student-payment-record" key={String(row.id)}>
-      <div className="student-record-card-top"><span className="student-stat-icon gold"><CreditCard size={18} /></span><span className={`status-tag student-status ${String(row.status)}`}>{String(row.status)}</span></div>
-      <span className="payment-record-label">Payment amount</span><strong className="payment-record-amount">{money(Number(row.amount_minor), String(row.currency))}</strong>
-      <div className="payment-record-details"><span><Clock3 size={14} />{date(row.verified_at ?? row.created_at, true)}</span><code>{String(row.provider_reference)}</code></div>
-      {verified ? <a className="button button-primary button-small receipt-download" href={`/api/payments/receipt?reference=${encodeURIComponent(String(row.provider_reference))}`}><Download size={15} /> Download PDF receipt</a> : <p className="payment-verification-note"><Clock3 size={14} />Receipt available after payment verification.</p>}
-    </article>;
-  })}</div> : <EmptyState title="No payment records">Verified payments will appear here.</EmptyState>;
 }
 
 function ProfileManager({ value, saving, onSave }: { value: JsonRecord | null; saving: boolean; onSave: (body: JsonRecord) => void }) {
@@ -555,8 +636,8 @@ function ProfileManager({ value, saving, onSave }: { value: JsonRecord | null; s
       </form>
       <form className="form-card manager-form profile-feature-card security-form" onSubmit={(event) => void updatePassword(event)}>
         <div className="composer-heading"><span className="composer-icon security"><KeyRound size={19} /></span><div><h2>Account security</h2><p>Change your sign-in password.</p></div></div>
-        <label className="field">New password<input type="password" autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={8} required /></label>
-        <label className="field">Confirm new password<input type="password" autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} minLength={8} required /></label>
+        <PasswordField label="New password" autoComplete="new-password" value={newPassword} onChange={setNewPassword} minLength={8} required />
+        <PasswordField label="Confirm new password" autoComplete="new-password" value={confirmPassword} onChange={setConfirmPassword} minLength={8} required />
         <p className="profile-form-note"><ShieldCheck size={15} /> Choose at least 8 characters. Your password is updated securely through account services.</p>
         {passwordError && <p className="profile-form-error" role="alert">{passwordError}</p>}
         {passwordMessage && <p className="success-message" role="status"><Check size={15} />{passwordMessage}</p>}
@@ -606,8 +687,4 @@ function datePart(value: unknown, part: "month" | "day" | "weekday") {
   if (part === "day") return new Intl.DateTimeFormat(undefined, { day: "2-digit" }).format(parsed);
   if (part === "month") return new Intl.DateTimeFormat(undefined, { month: "short" }).format(parsed).toUpperCase();
   return new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(parsed);
-}
-
-function money(minor: number, currency: string) {
-  return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(minor / 100);
 }

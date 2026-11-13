@@ -9,8 +9,7 @@ export async function middleware(request: NextRequest) {
     return response;
   };
   const isMutation = ["POST", "PUT", "PATCH", "DELETE"].includes(request.method);
-  const isSignedProviderWebhook = request.nextUrl.pathname === "/api/payments/webhook";
-  if (isApiRequest && isMutation && !isSignedProviderWebhook) {
+  if (isApiRequest && isMutation) {
     const origin = request.headers.get("origin");
     let originUrl: URL | null = null;
     try { if (origin) originUrl = new URL(origin); } catch { originUrl = null; }

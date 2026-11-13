@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "An active application already exists for this programme." }, { status: 409 });
     }
     if (error.message.includes("unavailable for application")) {
-      return NextResponse.json({ error: "This programme is unavailable or its fee is not approved." }, { status: 400 });
+      return NextResponse.json({ error: "This programme is not currently open for applications." }, { status: 400 });
     }
     console.error("Could not save application draft:", error.message);
     return NextResponse.json({ error: "Could not save your application. Please try again." }, { status: 500 });

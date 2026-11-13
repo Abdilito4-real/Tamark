@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { PasswordField } from "@/components/password-field";
 
 export function PasswordResetRequestForm() {
   const [email, setEmail] = useState("");
@@ -49,8 +50,8 @@ export function PasswordUpdateForm() {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    if (password.length < 12) {
-      setError("Use a password with at least 12 characters.");
+    if (password.length < 8) {
+      setError("Use a password with at least 8 characters.");
       return;
     }
     if (password !== confirm) {
@@ -74,8 +75,8 @@ export function PasswordUpdateForm() {
 
   if (updated) return <p className="notice" role="status">Your password has been updated. You can now sign in with your new password.</p>;
   return <form className="form-card" onSubmit={(event) => void submit(event)}>
-    <label className="field">New password<input type="password" autoComplete="new-password" minLength={12} value={password} onChange={(event) => setPassword(event.target.value)} required /></label>
-    <label className="field">Confirm new password<input type="password" autoComplete="new-password" minLength={12} value={confirm} onChange={(event) => setConfirm(event.target.value)} required /></label>
+    <PasswordField label="New password" autoComplete="new-password" minLength={8} value={password} onChange={setPassword} required />
+    <PasswordField label="Confirm new password" autoComplete="new-password" minLength={8} value={confirm} onChange={setConfirm} required />
     {error && <p className="wizard-error" role="alert">{error}</p>}
     <button className="button button-primary" type="submit" disabled={busy}>{busy ? "Updating…" : "Update password"}</button>
   </form>;

@@ -14,7 +14,7 @@ export default function CookiePolicyPage() {
     title="Cookie Policy"
     intro="This draft explains the categories shown in Cookie Preferences. Tamark must verify the live cookie inventory and approve the final notice."
     sections={[
-      { title: "What are cookies and similar technologies?", paragraphs: ["Cookies and browser storage can support sessions, remember preferences or provide optional analytics and marketing features. The consent interface stores its choice in local browser storage; it does not store names, account IDs or payment details."] },
+      { title: "What are cookies and similar technologies?", paragraphs: ["Cookies and browser storage can support sessions, remember preferences or provide optional analytics and marketing features. The consent interface stores its choice in local browser storage; that choice does not include names, account IDs, or application data."] },
       { title: "Essential technologies", paragraphs: ["Essential technologies support core site security and authenticated account sessions. They cannot be switched off in Cookie Preferences."] },
       { title: "Optional categories", paragraphs: ["Analytics, functional and marketing categories are off by default. No analytics or marketing provider is currently configured in this application. The functional category has no optional provider configured at this time."] },
       { title: "Manage your choices", paragraphs: ["Choose Accept all, Reject optional or Customize preferences in the consent banner. Use Cookie Preferences in the site footer to change or withdraw optional choices. Changes are applied immediately to the application's consent state."] },
